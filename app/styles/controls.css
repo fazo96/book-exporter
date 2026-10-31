@@ -1,0 +1,209 @@
+/* ─── Buttons, inputs and the form grid every tab uses ─── */
+button,
+.button {
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 0.4em 0.9em;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  line-height: 1.4;
+}
+
+button:hover:not(:disabled),
+.button:hover {
+  border-color: var(--ink-faint);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--paper);
+}
+
+button.big {
+  padding: 0.55em 1.4em;
+}
+
+button.link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+button.link.danger {
+  color: var(--error);
+}
+
+button.icon {
+  padding: 0.15em 0.55em;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="url"],
+input[type="password"],
+select,
+textarea {
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 0.4em 0.6em;
+  width: 100%;
+  min-width: 0;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--accent-wash);
+  border-color: var(--accent);
+}
+
+textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+textarea.mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  tab-size: 2;
+}
+
+.row {
+  display: flex;
+  gap: 0.6em;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.panel {
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 1.1em 1.3em 1.3em;
+  margin-bottom: 1.2em;
+}
+
+.panel h2 {
+  margin: 0 0 0.6em;
+  font-size: 1.25em;
+}
+
+.panel .intro {
+  margin: -0.2em 0 1em;
+  color: var(--ink-soft);
+  max-width: 48em;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.9em 1.2em;
+}
+
+.grid .wide,
+.field.wide {
+  grid-column: 1 / -1;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+}
+
+.field-label {
+  font-size: 0.82em;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.field-hint {
+  display: block;
+  font-size: 0.82em;
+  color: var(--ink-faint);
+}
+
+.num {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+}
+
+.num input {
+  max-width: 7em;
+}
+
+.unit {
+  color: var(--ink-faint);
+  font-size: 0.9em;
+}
+
+.toggles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: 0.6em 1.2em;
+}
+
+.toggle {
+  display: flex;
+  gap: 0.55em;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.toggle input {
+  margin-top: 0.3em;
+  accent-color: var(--accent);
+}
+
+.toggle.inline {
+  align-items: center;
+}
+
+.toggle.inline input {
+  margin-top: 0;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.72em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.05em 0.5em;
+  border-radius: 999px;
+  background: var(--accent-wash);
+  color: var(--accent);
+  margin-left: 0.4em;
+  vertical-align: 0.1em;
+}
+
+.dot {
+  display: inline-block;
+  width: 0.45em;
+  height: 0.45em;
+  border-radius: 50%;
+  background: var(--warn);
+  margin-left: 0.4em;
+  vertical-align: 0.15em;
+}
+
+.dot.on {
+  background: var(--ok);
+}

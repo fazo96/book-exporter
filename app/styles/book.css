@@ -1,0 +1,355 @@
+/* ─── A book's page: the top bar, tabs and each tab ─── */
+.book {
+  min-height: 100vh;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.6rem 1rem;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+}
+
+.topbar .back {
+  text-decoration: none;
+  font-size: 1.3em;
+  color: var(--ink-soft);
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 1.2em;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.save-state {
+  color: var(--ink-faint);
+  font-size: 0.85em;
+}
+
+.save-state.dirty {
+  color: var(--warn);
+}
+
+.tabs {
+  display: flex;
+  gap: 0.2rem;
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--rule);
+  overflow-x: auto;
+  max-width: var(--measure);
+  margin: 0 auto;
+}
+
+.tabs a {
+  padding: 0.7em 0.9em;
+  color: var(--ink-soft);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+
+.tabs a.active {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.tab-body {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 1.2rem 1rem 5rem;
+}
+
+.banner {
+  max-width: var(--measure);
+  margin: 0.8rem auto 0;
+  padding: 0 1rem;
+}
+
+/* Manuscript */
+.stats {
+  margin: 0 0 1em;
+}
+
+.dropzone {
+  border: 2px dashed var(--rule);
+  border-radius: 10px;
+  padding: 1em 1.2em;
+}
+
+.dropzone.over {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+
+.dropzone > p:first-child {
+  margin-top: 0;
+}
+
+.paste {
+  margin-top: 0.8em;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
+  align-items: flex-start;
+}
+
+.outline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 32rem;
+  overflow-y: auto;
+}
+
+.outline li {
+  display: flex;
+  gap: 0.6em;
+  align-items: baseline;
+  padding: 0.2em 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.outline .text {
+  flex: 1;
+}
+
+.outline .badge {
+  margin: 0;
+  min-width: 5.2em;
+  text-align: center;
+}
+
+.outline .role-title,
+.outline .role-scene {
+  color: var(--ink-soft);
+}
+
+.outline .role-title .badge {
+  background: var(--rule);
+  color: var(--ink-soft);
+}
+
+.outline .role-part .text {
+  font-weight: 600;
+}
+
+.versions {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.versions li {
+  display: flex;
+  gap: 1em;
+  align-items: baseline;
+  padding: 0.25em 0;
+  flex-wrap: wrap;
+}
+
+/* Book */
+.author-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 1.2em;
+  align-items: end;
+}
+
+.cover-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8em;
+  align-items: flex-start;
+}
+
+.cover-preview {
+  width: 12rem;
+  aspect-ratio: 1 / 1.6;
+  border: 1px dashed var(--rule);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.5em;
+  overflow: hidden;
+}
+
+.cover-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Front & back */
+.group-label {
+  font-size: 1em;
+  margin: 1.4em 0 0.5em;
+  color: var(--ink-soft);
+}
+
+.matter-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
+.matter-card {
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+}
+
+.matter-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.35em 0.6em;
+}
+
+.matter-head .matter-title {
+  flex: 1;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0.3em 0;
+}
+
+.matter-body {
+  padding: 0.4em 1em 1em;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8em;
+  align-items: flex-start;
+}
+
+.matter-body .grid {
+  width: 100%;
+}
+
+.preview pre {
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--paper);
+  padding: 0.6em 0.8em;
+  border-radius: 6px;
+}
+
+.story-marker {
+  margin: 1.4em 0 0;
+  text-align: center;
+  color: var(--ink-faint);
+  font-family: var(--font-serif);
+  font-style: italic;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: 0.6em;
+}
+
+/* Custom */
+.subtabs {
+  display: flex;
+  gap: 0.4em;
+  margin-bottom: 1em;
+  flex-wrap: wrap;
+}
+
+.subtabs button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.custom-tab h2 code {
+  background: none;
+  padding: 0;
+}
+
+/* Export */
+.log-wrap {
+  margin-top: 1em;
+}
+
+.log {
+  margin-top: 0.5em;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 0.6em 0.8em;
+  max-height: 24rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log-step {
+  font-weight: 700;
+  margin-top: 0.4em;
+}
+
+.log-warn {
+  color: var(--warn);
+}
+
+.log-error {
+  color: var(--error);
+}
+
+.files {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+}
+
+.files li {
+  display: flex;
+  gap: 1em;
+}
+
+.pdf-preview {
+  margin-top: 0.8em;
+  width: 100%;
+  height: 80vh;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: white;
+}
+
+@media (max-width: 640px) {
+  .author-row {
+    grid-template-columns: 1fr;
+  }
+  .save-state {
+    display: none;
+  }
+}
+
+/* ─── The pen link (Manuscript tab) ─── */
+.pen-link {
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 0.6em 0.9em 0.8em;
+  margin-bottom: 1em;
+}
+
+.pen-link p {
+  margin: 0 0 0.5em;
+}

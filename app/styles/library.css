@@ -1,0 +1,139 @@
+/* ─── The library ─── */
+.library {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 2rem 1rem 5rem;
+  min-height: 100vh;
+}
+
+.library.dragging {
+  outline: 3px dashed var(--accent);
+  outline-offset: -12px;
+}
+
+.library-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.library-head h1 {
+  margin: 0;
+  font-size: 1.8em;
+}
+
+.empty {
+  text-align: center;
+  padding: 4rem 1rem;
+  color: var(--ink-soft);
+  border: 2px dashed var(--rule);
+  border-radius: 12px;
+}
+
+.shelf {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1rem;
+}
+
+.book-card {
+  display: flex;
+  gap: 0.9rem;
+  padding: 0.8rem;
+  border-radius: 10px;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  text-decoration: none;
+  height: 100%;
+}
+
+.book-card:hover {
+  box-shadow: var(--shadow);
+}
+
+.cover-thumb {
+  flex: none;
+  width: 4.5rem;
+  aspect-ratio: 1 / 1.6;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--accent);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.25);
+}
+
+.cover-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cloth {
+  display: block;
+  padding: 0.5em 0.4em;
+  color: var(--paper);
+  font-family: var(--font-serif);
+  font-size: 0.7em;
+  line-height: 1.2;
+}
+
+.card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15em;
+  min-width: 0;
+}
+
+.card-text strong {
+  font-family: var(--font-serif);
+  font-size: 1.1em;
+}
+
+.card-text .meta {
+  color: var(--ink-faint);
+  font-size: 0.85em;
+  margin-top: auto;
+}
+
+.drop-hint {
+  text-align: center;
+  color: var(--ink-faint);
+  font-size: 0.85em;
+  margin-top: 2rem;
+}
+
+/* ─── Import from pen ─── */
+.row.spread {
+  justify-content: space-between;
+}
+
+.pen-connect {
+  display: grid;
+  gap: 0.6em;
+  max-width: 28rem;
+}
+
+.pen-connect .intro {
+  margin: 0;
+}
+
+.pen-books {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.pen-books li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+  padding: 0.5em 0;
+  border-top: 1px solid var(--rule);
+}

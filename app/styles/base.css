@@ -1,0 +1,103 @@
+/* ─── Palette ───────────────────────────────────────────────
+   pen's: paper and iron-gall ink by day, a lamp-lit study by night. */
+:root {
+  --paper: #f3ead3;
+  --paper-raised: #f8f1de;
+  --ink: #1f2433;
+  --ink-soft: #4b4f5e;
+  --ink-faint: rgb(31 36 51 / 0.5);
+  --rule: rgb(31 36 51 / 0.14);
+  --accent: #8a3324;
+  --accent-wash: rgb(138 51 36 / 0.09);
+  --ok: #2f6f68;
+  --warn: #9a6114;
+  --error: #a3271b;
+  --shadow: 0 10px 30px -14px rgb(60 40 10 / 0.3);
+
+  --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, "DejaVu Sans Mono", monospace;
+  --font-serif: "Iowan Old Style", Georgia, serif;
+  --measure: 60rem;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #16130f;
+    --paper-raised: #1f1b16;
+    --ink: #e7dbc1;
+    --ink-soft: #b5a88f;
+    --ink-faint: rgb(231 219 193 / 0.45);
+    --rule: rgb(231 219 193 / 0.12);
+    --accent: #e2a55a;
+    --accent-wash: rgb(226 165 90 / 0.1);
+    --ok: #7fc4b5;
+    --warn: #e2a55a;
+    --error: #f08a7a;
+    --shadow: 0 12px 34px -12px rgb(0 0 0 / 0.7);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #16130f;
+  --paper-raised: #1f1b16;
+  --ink: #e7dbc1;
+  --ink-soft: #b5a88f;
+  --ink-faint: rgb(231 219 193 / 0.45);
+  --rule: rgb(231 219 193 / 0.12);
+  --accent: #e2a55a;
+  --accent-wash: rgb(226 165 90 / 0.1);
+  --ok: #7fc4b5;
+  --warn: #e2a55a;
+  --error: #f08a7a;
+  --shadow: 0 12px 34px -12px rgb(0 0 0 / 0.7);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--accent);
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--accent-wash);
+  padding: 0 0.25em;
+  border-radius: 3px;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.muted {
+  color: var(--ink-faint);
+}
+
+.error {
+  color: var(--error);
+}
+
+.notice {
+  color: var(--ok);
+}
