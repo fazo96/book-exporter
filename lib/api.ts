@@ -31,6 +31,7 @@ export const api = {
   saveMatter: async (id: string, mid: string, body: string) => void (await check(await fetch(`${base(id)}/matter/${mid}`, json("PUT", { body })))),
   deleteMatter: async <T,>(id: string, mid: string) => (await (await check(await fetch(`${base(id)}/matter/${mid}`, { method: "DELETE" }))).json()) as T,
   saveCustom: async (id: string, kind: string, text: string) => void (await check(await fetch(`${base(id)}/custom/${kind}`, json("PUT", { text })))),
+  saveNotes: async (id: string, text: string) => void (await check(await fetch(`${base(id)}/notes`, json("PUT", { text })))),
   uploadCover: async (id: string, file: Blob) => void (await check(await fetch(`${base(id)}/cover`, { method: "PUT", body: file }))),
   deleteCover: async (id: string) => void (await check(await fetch(`${base(id)}/cover`, { method: "DELETE" }))),
   build: async (id: string, formats: string[]) => check(await fetch(`${base(id)}/build`, json("POST", { formats }))),

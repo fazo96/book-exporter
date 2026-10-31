@@ -14,8 +14,11 @@
 <id>/build/           the last export's working folder (rebuildable)
 <id>/dist/            the last export: the files, build.json, build.log
 <id>/pen.json         the pen book its manuscript is pulled from (lib/pen.ts)
+<id>/notes.md         the Notes: the art direction Construct follows
+<id>/construct/       Construct's chats, snapshots/ and renders/ (docs/construct.md)
 .trash/<id>--<time>/  deleted books
 .bookx-pen.json       the pen connection: pen's address and session (mode 600)
+.bookx-construct.json the model Construct's new chats start on
 ```
 
 Ids match `^[a-z0-9][a-z0-9-]{0,79}$` (`lib/ids.ts`), which also keeps paths inside the library. A new book's id is its title slugified, with `-2`, `-3`… when taken; `project.json` is created with `createExclusive`, so two imports can't claim one folder.
@@ -40,7 +43,7 @@ Replacing the manuscript (`replaceManuscript`) moves the old text to `versions/<
 
 ## Copies
 
-`cloneProject` copies a book to `<id>-copy` (`-copy-2`, `-copy-3`… when taken): its settings, manuscript, matter, custom files, cover and pen link, but not its versions or exports. The copy gets a new identifier, since a copy is usually another edition (a paperback, an advance copy) and stores and e-readers tell editions apart by it. The title stays, so the library shows the id on cards whose titles are shared.
+`cloneProject` copies a book to `<id>-copy` (`-copy-2`, `-copy-3`… when taken): its settings, manuscript, matter, custom files, Notes, cover and pen link, but not its versions, exports or Construct's chats. The copy gets a new identifier, since a copy is usually another edition (a paperback, an advance copy) and stores and e-readers tell editions apart by it. The title stays, so the library shows the id on cards whose titles are shared.
 
 ## pen
 

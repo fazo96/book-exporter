@@ -5,6 +5,7 @@ import "./styles/base.css";
 import "./styles/controls.css";
 import "./styles/library.css";
 import "./styles/book.css";
+import "./styles/construct.css";
 
 export const metadata: Metadata = {
   title: "book-exporter",

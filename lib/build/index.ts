@@ -39,7 +39,8 @@ const building = (g.__bookxBuilding ??= new Set());
 
 export const isBuilding = (id: string) => building.has(id);
 
-export async function buildProject(id: string, formats: Format[], send: (e: BuildEvent) => void): Promise<BuildInfo> {
+/** `pull: false` skips the pull from pen even when the book asks for one (Construct's exports: the text stays put while it iterates). */
+export async function buildProject(id: string, formats: Format[], send: (e: BuildEvent) => void, { pull = true }: { pull?: boolean } = {}): Promise<BuildInfo> {
   if (building.has(id)) throw new Error("an export of this book is already running");
   building.add(id);
   const logLines: string[] = [];
@@ -52,7 +53,7 @@ export async function buildProject(id: string, formats: Format[], send: (e: Buil
     send({ t: "step", name });
   };
   try {
-    return await run(id, formats, { log, step, logLines });
+    return await run(id, formats, { log, step, logLines, pull });
   } finally {
     building.delete(id);
   }
@@ -62,11 +63,12 @@ interface Ctx {
   log: Log;
   step: (name: string) => void;
   logLines: string[];
+  pull: boolean;
 }
 
-async function run(id: string, formats: Format[], { log, step, logLines }: Ctx): Promise<BuildInfo> {
+async function run(id: string, formats: Format[], { log, step, logLines, pull: canPull }: Ctx): Promise<BuildInfo> {
   const link = await readPenLink(id);
-  if (link?.pullOnExport) {
+  if (link?.pullOnExport && canPull) {
     step("Pull from pen");
     try {
       const { change } = await pull(id);

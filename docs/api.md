@@ -15,6 +15,10 @@
 | `POST /api/projects/<id>/matter` `{ kind }` | Add a section from a template |
 | `PUT` / `DELETE /api/projects/<id>/matter/<mid>` | Save a section's text `{ body }` / delete it |
 | `PUT /api/projects/<id>/custom/<css\|typ\|lua>` `{ text }` | Save a custom file (empty removes it) |
+| `PUT /api/projects/<id>/notes` `{ text }` | Save the Notes (empty removes them) |
+| `GET /api/projects/<id>/construct` | Construct's conversation, as server-sent events: a snapshot, then every change (`ConstructEvent`) ([Construct](construct.md)) |
+| `POST /api/projects/<id>/construct` `{ action, … }` | Drive it (`ConstructAction`: start, prompt, cancel, compact, reset, chats, model, revert); answers 204, 409 while it's answering, 503 when Construct is off |
+| `GET /api/projects/<id>/construct/renders/<file>` | A page Construct rendered |
 | `GET` / `PUT` / `DELETE /api/projects/<id>/cover` | The cover; PUT takes the image as the body |
 | `POST /api/projects/<id>/build` `{ formats }` | Export; streams `{ t: "step" \| "log" \| "done" \| "error" }` lines. 409 while one runs |
 | `GET /api/projects/<id>/files/<name>` | A file of the last export (`?inline` to show it rather than download) |
@@ -24,6 +28,8 @@
 | `GET` / `PUT` / `DELETE /api/pen` | The pen connection `{ url, signedIn, error? }` / connect with `{ url, password? }` / forget it |
 | `GET /api/pen/books` | pen's books, as pen lists them |
 | `POST /api/pen/import` `{ doc }` | A new book from pen, linked → `{ id }` |
+| `GET /api/construct/models` | The agents Construct can run on, with their models |
+| `POST /api/construct/mcp` | Construct's tools, for the agent process only: MCP over JSON-RPC, with the session's bearer token |
 
 To update a book's manuscript from a script and export it:
 

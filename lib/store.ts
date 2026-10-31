@@ -22,6 +22,8 @@ import { queue } from "./queue";
 //   <id>/cover.<ext>      png, jpg, webp or svg
 //   <id>/dist/            the last export, and build.json about it
 //   <id>/pen.json         the pen book it pulls its manuscript from (lib/pen.ts)
+//   <id>/notes.md         the writer's notes: the art direction Construct follows
+//   <id>/construct/       Construct's chats, snapshots and rendered pages
 //
 // Deletes move a folder to .trash/. Every read-modify-write of a project goes
 // through its queue.
@@ -29,6 +31,7 @@ import { queue } from "./queue";
 export const MAX_MANUSCRIPT = 10 * 1024 * 1024;
 export const MAX_COVER = 20 * 1024 * 1024;
 export const MAX_CUSTOM = 512 * 1024;
+export const MAX_NOTES = 512 * 1024;
 
 export type CustomKind = "css" | "typ" | "lua";
 const CUSTOM_FILES: Record<CustomKind, string> = { css: "custom.css", typ: "custom.typ", lua: "filter.lua" };
@@ -157,9 +160,9 @@ async function claimId(base: string, config: BookConfig, suffix: (n: number) => 
 
 /**
  * A copy of a book to take elsewhere (another edition, an experiment): its
- * settings, manuscript, matter, custom files, cover and pen link, with a new
- * identifier (stores and readers tell editions apart by it). Not its versions
- * or exports.
+ * settings, manuscript, matter, custom files, notes, cover and pen link, with
+ * a new identifier (stores and readers tell editions apart by it). Not its
+ * versions, exports or Construct's chats.
  */
 export async function cloneProject(id: string): Promise<{ id: string }> {
   return run(id)(async () => {
@@ -169,7 +172,7 @@ export async function cloneProject(id: string): Promise<{ id: string }> {
     const to = await claimId(`${id.slice(0, 70)}-copy`, config, (n) => `-${n}`);
     await writeAtomic(fileOf(to, "manuscript.md"), await readManuscript(id));
     for (const m of config.matter) await writeAtomic(fileOf(to, "matter", `${m.id}.md`), await readMatter(id, m.id));
-    for (const name of [...Object.values(CUSTOM_FILES), "pen.json"]) {
+    for (const name of [...Object.values(CUSTOM_FILES), "notes.md", "pen.json"]) {
       const text = await readText(fileOf(id, name));
       if (text !== null) await writeAtomic(fileOf(to, name), text);
     }
@@ -321,6 +324,100 @@ export function writeCustom(id: string, kind: CustomKind, text: string): Promise
     if (text.trim()) await writeAtomic(file, text);
     else await unlink(file).catch(() => {});
   });
+}
+
+// -------------------------------------------------------------------- notes
+
+export const readNotes = (id: string) => readText(fileOf(id, "notes.md")).then((t) => t ?? "");
+
+export function writeNotes(id: string, text: string): Promise<void> {
+  return run(id)(async () => {
+    const file = fileOf(id, "notes.md");
+    if (text.trim()) await writeAtomic(file, text);
+    else await unlink(file).catch(() => {});
+  });
+}
+
+// ---------------------------------------------------------------- construct
+
+const CHAT_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
+export const isValidChatId = (c: unknown): c is string => typeof c === "string" && CHAT_RE.test(c);
+
+/** Construct's stored chats (lib/construct/chats.ts), unchecked; unreadable files are skipped. */
+export async function readChats(id: string): Promise<unknown[]> {
+  const dir = fileOf(id, "construct");
+  const names = await readdir(dir).catch(() => [] as string[]);
+  const out: unknown[] = [];
+  for (const name of names.filter((n) => n.endsWith(".json"))) {
+    try {
+      out.push(JSON.parse(await readFile(path.join(dir, name), "utf8")));
+    } catch {}
+  }
+  return out;
+}
+
+export function writeChat(id: string, chat: string, data: unknown): Promise<void> {
+  if (!isValidChatId(chat)) throw new Error(`invalid chat id: ${chat}`);
+  return writeAtomic(fileOf(id, "construct", `${chat}.json`), JSON.stringify(data));
+}
+
+/** A deleted chat goes to construct/trash/. */
+export async function trashChat(id: string, chat: string): Promise<void> {
+  if (!isValidChatId(chat)) throw new Error(`invalid chat id: ${chat}`);
+  await mkdir(fileOf(id, "construct", "trash"), { recursive: true });
+  await rename(fileOf(id, "construct", `${chat}.json`), fileOf(id, "construct", "trash", `${chat}.json`)).catch((err: NodeJS.ErrnoException) => {
+    if (err.code !== "ENOENT") throw err;
+  });
+}
+
+/** What Construct can change, snapshotted before a turn's first change (restoreSnapshot puts it back). */
+const SNAPSHOT_FILES = ["project.json", ...Object.values(CUSTOM_FILES), "notes.md"];
+const snapshotDir = (id: string, name: string) => {
+  if (!isValidChatId(name)) throw new Error(`invalid snapshot: ${name}`);
+  return fileOf(id, "construct", "snapshots", name);
+};
+
+/** Copy the settings, the matter, the custom files and the notes to construct/snapshots/<name>/. */
+export function snapshotBook(id: string, name: string): Promise<void> {
+  return run(id)(async () => {
+    const dir = snapshotDir(id, name);
+    await rm(dir, { recursive: true, force: true });
+    await mkdir(path.join(dir, "matter"), { recursive: true });
+    for (const file of SNAPSHOT_FILES) {
+      const text = await readText(fileOf(id, file));
+      if (text !== null) await writeAtomic(path.join(dir, file), text);
+    }
+    for (const m of await readdir(fileOf(id, "matter")).catch(() => [] as string[])) {
+      if (m.endsWith(".md")) await writeAtomic(path.join(dir, "matter", m), await readFile(fileOf(id, "matter", m)));
+    }
+  });
+}
+
+/** Put a snapshot back: the files it has are restored, the ones it lacks removed. */
+export function restoreSnapshot(id: string, name: string): Promise<void> {
+  return run(id)(async () => {
+    const dir = snapshotDir(id, name);
+    if ((await readText(path.join(dir, "project.json"))) === null) throw new Error("That snapshot is gone.");
+    for (const file of SNAPSHOT_FILES) {
+      const text = await readText(path.join(dir, file));
+      if (text !== null) await writeAtomic(fileOf(id, file), text);
+      else await unlink(fileOf(id, file)).catch(() => {});
+    }
+    const kept = new Set(await readdir(path.join(dir, "matter")).catch(() => [] as string[]));
+    for (const m of await readdir(fileOf(id, "matter")).catch(() => [] as string[])) {
+      if (!kept.has(m)) await unlink(fileOf(id, "matter", m)).catch(() => {});
+    }
+    for (const m of kept) await writeAtomic(fileOf(id, "matter", m), await readFile(path.join(dir, "matter", m)));
+  });
+}
+
+/** Pages Construct rendered (lib/construct/tools/preview.ts), shown in its panel. */
+export const rendersDir = (id: string) => fileOf(id, "construct", "renders");
+
+export async function renderFile(id: string, name: string): Promise<string | null> {
+  if (!/^[a-z0-9][a-z0-9-]*\.png$/.test(name)) return null;
+  const file = fileOf(id, "construct", "renders", name);
+  return (await stat(file).catch(() => null))?.isFile() ? file : null;
 }
 
 // --------------------------------------------------------------------- cover

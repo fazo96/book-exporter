@@ -26,6 +26,7 @@ There's no lock or login: it listens where `next` is told to (`-H 127.0.0.1` kee
 | `BOOKX_DIR` | `./data` | The library |
 | `BOOKX_FONT_PATHS` | `TYPST_FONT_PATHS` | Colon-separated font folders: Typst sets the PDF from them and the EPUB embeds files from them. `nix develop` sets both |
 | `BOOKX_DEV_ORIGINS` | | Comma-separated hostnames or addresses other machines use to reach `next dev` (`allowedDevOrigins`): without them it refuses its live-reload socket to them |
+| `BOOKX_AI` | | `off` turns Construct off even with an agent installed ([Construct](construct.md#when-its-on), which has its other variables) |
 
 To try it from another machine on the network: `BOOKX_DEV_ORIGINS=<this machine's LAN IP>,<hostname> npx next dev -p 3100 -H 0.0.0.0`.
 

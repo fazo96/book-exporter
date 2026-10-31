@@ -13,7 +13,10 @@
     "cli": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/register.mjs scripts/cli.ts"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "^1.9.0",
+    "marked": "^17.0.6",
     "next": "^16.3.7",
+    "pi-mcp-adapter": "^5.0.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "server-only": "^0.0.1"

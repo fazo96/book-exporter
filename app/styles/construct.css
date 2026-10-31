@@ -1,0 +1,773 @@
+/* ─── Construct ────────────────────────────────────────────────
+   The agent's side panel (from pen): a sheet from the right on narrow
+   screens, a rail beside the book's page on wide ones. Pen's own base
+   styles it relies on come first, scoped to the panel. */
+:root {
+  --construct-w: 420px;
+  --font-body: var(--font-serif);
+  --text-label: 11px;
+}
+
+.construct button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.construct button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.construct select,
+.construct textarea {
+  width: auto;
+  min-height: 0;
+}
+.construct .label {
+  font-family: var(--font-ui);
+  font-size: var(--text-label);
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.construct .icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: var(--ink-soft);
+  transition: color 0.2s, background-color 0.2s;
+}
+.construct .icon-btn:hover {
+  color: var(--ink);
+  background: var(--accent-wash);
+}
+.construct .popover-menu {
+  position: absolute;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.construct-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 29;
+  background: rgb(0 0 0 / 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.construct-scrim.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* The top bar's button. */
+.construct-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+}
+.construct-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+.construct-toggle.is-on {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.construct {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 30;
+  width: min(100vw, var(--construct-w));
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 0;
+  background: var(--paper-raised);
+  border-left: 1px solid var(--rule);
+  box-shadow: var(--shadow);
+  transform: translateX(102%);
+  visibility: hidden;
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 0.35s;
+}
+.construct.is-open {
+  transform: none;
+  visibility: visible;
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.construct-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 8px 0 20px;
+  border-bottom: 1px solid var(--rule);
+}
+.construct-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.construct-name {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 19px;
+  color: var(--ink);
+}
+.construct-name.is-chat {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 17px;
+}
+.construct-head-actions {
+  display: flex;
+  gap: 2px;
+}
+.construct-head-actions .icon-btn:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* One line: the model button on the left, the context meter on the right. */
+.construct-config {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+  padding: 0 8px 0 20px;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.construct-model {
+  position: relative;
+  min-width: 0;
+}
+.construct-model-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px 0;
+  color: var(--ink-soft);
+}
+.construct-model-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.construct-model-btn svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+}
+.construct-model-btn:hover,
+.construct-model-btn[aria-expanded="true"] {
+  color: var(--ink);
+}
+.construct-model-menu {
+  top: calc(100% + 4px);
+  left: -10px;
+  gap: 2px;
+  min-width: 220px;
+  padding: 6px 12px;
+}
+.construct-select {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.construct-select .label {
+  flex: none;
+  width: 5.5em;
+}
+.construct-select select {
+  max-width: 14em;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--ink-soft);
+  background: transparent;
+  border: none;
+  padding: 6px 0;
+  cursor: pointer;
+}
+.construct-select select option {
+  background: var(--paper-raised);
+  color: var(--ink);
+}
+.construct-model-hint {
+  margin: 2px 0 4px;
+  font-family: var(--font-ui);
+  font-size: var(--text-label);
+  color: var(--ink-faint);
+}
+.construct-context {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.construct-context-meter {
+  width: 40px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--rule);
+  overflow: hidden;
+}
+.construct-context-meter > span {
+  display: block;
+  height: 100%;
+  background: var(--ink-faint);
+  transition: width 0.3s ease;
+}
+.construct-context.is-full .construct-context-meter > span {
+  background: var(--warn);
+}
+.construct-context.is-full .construct-context-text {
+  color: var(--warn);
+}
+.construct-context-text {
+  white-space: nowrap;
+}
+.construct-context-compact {
+  width: 30px;
+  height: 30px;
+}
+.construct-context-compact svg {
+  width: 16px;
+  height: 16px;
+}
+.construct-context-compact:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+/* Phones: the percentage is enough; the counts are in the meter's title. */
+@media (max-width: 479px) {
+  .construct-context-tokens {
+    display: none;
+  }
+}
+
+.construct-log {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.construct-empty {
+  margin: auto 0;
+  color: var(--ink-soft);
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.construct-empty p {
+  margin: 0 0 0.8em;
+}
+
+.construct-msg {
+  font-family: var(--font-body);
+  font-size: 15.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.construct-msg p {
+  margin: 0;
+}
+.construct-msg.is-user {
+  align-self: flex-end;
+  max-width: 88%;
+  margin-top: 8px;
+  padding: 9px 14px;
+  border-radius: 14px 14px 4px 14px;
+  background: var(--accent-wash);
+  white-space: pre-wrap;
+}
+
+.construct-md > :first-child {
+  margin-top: 0;
+}
+.construct-md > :last-child {
+  margin-bottom: 0;
+}
+.construct-md p,
+.construct-md ul,
+.construct-md ol,
+.construct-md blockquote,
+.construct-md pre {
+  margin: 0 0 0.7em;
+}
+.construct-md ul,
+.construct-md ol {
+  padding-left: 1.3em;
+}
+.construct-md li + li {
+  margin-top: 0.2em;
+}
+.construct-md h1,
+.construct-md h2,
+.construct-md h3,
+.construct-md h4 {
+  margin: 1em 0 0.4em;
+  font-size: 1em;
+  font-weight: 600;
+}
+.construct-md blockquote {
+  padding-left: 12px;
+  border-left: 2px solid var(--rule);
+  color: var(--ink-soft);
+  font-style: italic;
+}
+.construct-md code {
+  font-family: var(--font-ui);
+  font-size: 0.82em;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--accent-wash);
+}
+.construct-md pre {
+  overflow-x: auto;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--accent-wash);
+}
+.construct-md pre code {
+  padding: 0;
+  background: none;
+}
+.construct-md a {
+  color: var(--accent);
+}
+
+.construct-md hr {
+  border: none;
+  border-top: 1px solid var(--rule);
+  margin: 1em 0;
+}
+.construct-md table {
+  border-collapse: collapse;
+  font-size: 0.92em;
+  margin: 0 0 0.7em;
+}
+.construct-md th,
+.construct-md td {
+  border: 1px solid var(--rule);
+  padding: 3px 8px;
+  text-align: left;
+}
+
+.construct-thought summary {
+  cursor: pointer;
+  list-style: none;
+}
+.construct-thought summary::-webkit-details-marker {
+  display: none;
+}
+.construct-thought summary::before {
+  content: "› ";
+}
+.construct-thought[open] summary::before {
+  content: "⌄ ";
+}
+.construct-thought:not(.construct-compaction-summary) p {
+  margin: 6px 0 0;
+  padding-left: 10px;
+  border-left: 1px solid var(--rule);
+  color: var(--ink-faint);
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.construct-tool {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--ink-faint);
+}
+.construct-tool + .construct-tool {
+  margin-top: -6px;
+}
+.construct-tool button {
+  color: var(--ink-soft);
+  text-align: left;
+  border-bottom: 1px solid var(--rule);
+}
+.construct-tool button:hover {
+  color: var(--accent);
+  border-bottom-color: currentColor;
+}
+.construct-tool-dot {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translateY(-1px);
+}
+.construct-tool.is-pending .construct-tool-dot,
+.construct-tool.is-in_progress .construct-tool-dot {
+  background: var(--warn);
+  animation: construct-pulse 1.2s ease-in-out infinite;
+}
+.construct-tool.is-failed {
+  color: var(--accent);
+}
+.construct-tool.is-failed .construct-tool-dot {
+  background: var(--accent);
+}
+
+.construct-compaction {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--rule);
+}
+.construct-compaction > p {
+  margin: 0;
+}
+.construct-compaction.is-in_progress > .label {
+  animation: construct-pulse 1.2s ease-in-out infinite;
+}
+.construct-compaction .construct-md {
+  margin-top: 6px;
+  padding-left: 10px;
+  border-left: 1px solid var(--rule);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.construct-plan {
+  margin: 0;
+  padding: 8px 12px 8px 30px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+.construct-plan .is-completed {
+  color: var(--ink-faint);
+  text-decoration: line-through;
+}
+.construct-plan .is-in_progress {
+  color: var(--ink);
+}
+
+.construct-notice {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+.construct-notice.is-error,
+.construct-error {
+  color: var(--accent);
+}
+.construct-error {
+  margin: 0;
+  padding: 8px 20px;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  border-top: 1px solid var(--rule);
+}
+.construct-error button {
+  color: var(--ink);
+  border-bottom: 1px solid currentColor;
+}
+
+.construct-working {
+  width: 5px;
+  height: 5px;
+  margin: 4px 0 0 1px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: construct-pulse 1.2s ease-in-out infinite;
+}
+@keyframes construct-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.construct-input {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0 12px calc(12px + env(safe-area-inset-bottom));
+  padding: 6px 6px 6px 14px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.construct-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
+.construct-input textarea {
+  flex: 1;
+  min-height: 34px;
+  max-height: 10.5em;
+  field-sizing: content;
+  resize: none;
+  padding: 7px 0;
+  font-family: var(--font-body);
+  font-size: 16px; /* no zoom-on-focus in iOS */
+  line-height: 1.35;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+.construct-input textarea::placeholder {
+  color: var(--ink-faint);
+  font-style: italic;
+}
+.construct-send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: var(--paper);
+  background: var(--ink);
+  transition: background-color 0.2s, opacity 0.2s;
+}
+.construct-send:hover {
+  background: var(--accent);
+}
+.construct-send:disabled {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.construct-log[hidden] {
+  display: none;
+}
+.construct-head-actions .icon-btn.is-on {
+  color: var(--accent);
+}
+
+.construct-chats {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  margin: 0;
+  padding: 8px 0;
+}
+.construct-chats li {
+  display: flex;
+  align-items: center;
+  padding-right: 8px;
+}
+.construct-chat {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px 10px 20px;
+  text-align: left;
+  transition: background-color 0.2s;
+}
+.construct-chat:hover {
+  background: var(--accent-wash);
+}
+.construct-chat:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.construct-chat-title {
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.construct-chats .is-current .construct-chat-title {
+  color: var(--accent);
+}
+.construct-chat-action {
+  flex: none;
+  opacity: 0.5;
+}
+.construct-chat-action:hover {
+  opacity: 1;
+}
+.construct-chat-confirm {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px 12px 20px;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+.construct-chat-confirm span {
+  flex: 1;
+}
+.construct-chat-confirm button {
+  color: var(--ink);
+  border-bottom: 1px solid currentColor;
+}
+.construct-chat-confirm .is-danger {
+  color: var(--accent);
+}
+.construct-chat-rename {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 4px 6px 12px;
+}
+.construct-chat-rename input {
+  width: 100%;
+  padding: 6px 8px;
+  font-family: var(--font-body);
+  /* 16px keeps iOS from zooming in on focus. */
+  font-size: 16px;
+  color: var(--ink);
+  background: var(--paper-raised);
+  border: 1px solid var(--accent);
+  border-radius: 7px;
+  outline: none;
+}
+
+:root[data-focus] .app-editor .construct {
+  visibility: hidden;
+}
+
+/* Wide screens: a rail under the top bar, and the page makes room. */
+
+/* Wide screens: a rail under the top bar, and the page makes room. */
+@media (min-width: 1100px) {
+  .construct {
+    top: 0;
+    padding-top: 0;
+    box-shadow: none;
+  }
+  .construct-scrim {
+    display: none;
+  }
+  .book.construct-open {
+    padding-right: var(--construct-w);
+  }
+}
+
+/* What render_pages showed the agent: thumbnails under its line in the log. */
+.construct-tool-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.construct-renders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 4px 14px;
+}
+.construct-renders button {
+  position: relative;
+  display: block;
+  border: 1px solid var(--rule) !important;
+  background: #fff !important;
+}
+.construct-renders img {
+  display: block;
+  width: auto;
+  height: 96px;
+}
+.construct-renders span {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  padding: 0 4px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  color: var(--ink-soft);
+  background: var(--paper-raised);
+  border-radius: 3px;
+}
+.construct-renders button:hover {
+  border-color: var(--accent) !important;
+}
+.construct-revert {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--ink-faint) !important;
+  text-decoration: underline;
+}
+.construct-revert:hover:not(:disabled) {
+  color: var(--accent) !important;
+}
+
+/* A rendered page, bigger, over the page. */
+.render-view {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  background: rgb(0 0 0 / 0.6);
+}
+.render-view img {
+  max-width: 100%;
+  max-height: calc(100vh - 80px);
+  background: #fff;
+  box-shadow: var(--shadow);
+  image-rendering: auto;
+}
+.render-view p {
+  margin: 0;
+  display: flex;
+  gap: 16px;
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+.render-view a,
+.render-view button.link {
+  color: #fff;
+}

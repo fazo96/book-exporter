@@ -1,0 +1,149 @@
+import "server-only";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import type { AgentLaunch } from "../acp";
+import { AGENT_NAMES, type AgentId, DEFAULT_AGENT } from "./agentInfo";
+
+export { type AgentId, isAgentId } from "./agentInfo";
+import { aiSwitchedOff, claudeFound, piFound } from "./detect";
+
+// The ACP agents Construct can run on (from pen). Each one is launched with
+// every built-in tool switched off, so the only things it can touch are
+// book-exporter's own tools (./tools/), served to it over MCP.
+
+/** The MCP server the tools come from, as the agent names it: its tools are `mcp__bookx__<tool>`. */
+export const MCP_NAME = "bookx";
+
+/** What a launch needs to know: where it runs, how it's told who it is, and the tools (none when probing models). */
+export type LaunchContext = {
+  cwd: string;
+  systemPrompt: string;
+  mcp?: { url: string; token: string; tools: string[] };
+};
+
+export type AgentPreset = {
+  name: string;
+  command: string[];
+  /** The tools reach it as ACP `mcpServers` ("acp"), or through its own config, set up in `env` ("self"). */
+  mcp: "acp" | "self";
+  /** Whether it can run on this server. */
+  available: () => boolean;
+  env?: (ctx: LaunchContext, mcpName: string) => Promise<Record<string, string>>;
+  /** `_meta` for session/new: the system prompt and lockdown options. */
+  sessionMeta: (ctx: LaunchContext, mcpName: string) => Record<string, unknown> | undefined;
+  /** The tool a call is to, when the agent says so beyond its title. */
+  toolName?: (call: ToolCallLike) => string | undefined;
+};
+
+type ToolCallLike = { _meta?: { [k: string]: unknown } | null; title?: string | null };
+
+const split = (cmd: string) => cmd.trim().split(/\s+/);
+
+const PI = process.env.BOOKX_PI ?? "pi";
+// Looked for once per process: installing an agent takes a restart.
+const once = (find: () => boolean) => {
+  let found: boolean | undefined;
+  return () => (found ??= !aiSwitchedOff() && find());
+};
+
+export const AGENTS = {
+  claude: {
+    name: AGENT_NAMES.claude,
+    command: split(process.env.BOOKX_CONSTRUCT_CLAUDE ?? "npx -y @agentclientprotocol/claude-agent-acp@0.84.0"),
+    mcp: "acp",
+    available: once(() => claudeFound()),
+    sessionMeta: ({ systemPrompt }, mcpName) => ({
+      systemPrompt,
+      claudeCode: {
+        options: {
+          tools: [], // no Read/Write/Edit/Bash/Web…: our MCP tools only
+          allowedTools: [`mcp__${mcpName}`, `mcp__${mcpName}__*`],
+          strictMcpConfig: true, // ignore the user's own MCP servers
+          settingSources: [], // ignore ~/.claude settings, hooks, CLAUDE.md
+          allowDangerouslySkipPermissions: false,
+        },
+      },
+    }),
+    toolName: (call) => {
+      const meta = call._meta?.claudeCode as { toolName?: unknown } | undefined;
+      return typeof meta?.toolName === "string" ? meta.toolName : undefined;
+    },
+  },
+  // pi through pi-acp, which runs scripts/pi-construct instead of pi itself to
+  // add the lockdown flags. pi-acp doesn't pass ACP's MCP servers on, so the
+  // tools come from the pi-mcp-adapter extension, pointed at a config file
+  // written for the session. The user's own pi extensions still load: that's
+  // where self-hosted model providers live.
+  pi: {
+    name: AGENT_NAMES.pi,
+    command: split(process.env.BOOKX_CONSTRUCT_PI ?? "npx -y pi-acp@0.0.34"),
+    mcp: "self",
+    available: once(() => piFound()),
+    async env({ cwd, systemPrompt, mcp }, mcpName) {
+      const env: Record<string, string> = {
+        PI_ACP_PI_COMMAND: path.join(process.cwd(), "scripts", "pi-construct"),
+        BOOKX_PI: PI,
+        BOOKX_SYSTEM_PROMPT: systemPrompt,
+        BOOKX_PI_TOOLS: "",
+      };
+      if (mcp) {
+        const config = path.join(cwd, ".bookx-mcp.json");
+        await writeFile(
+          config,
+          JSON.stringify({
+            // `mcp__bookx_<tool>`, close to Claude Code's names; and only our tools, no `mcp` search proxy.
+            settings: { toolPrefix: "mcp", directTools: true, disableProxyTool: true },
+            mcpServers: {
+              [mcpName]: { url: mcp.url, auth: "bearer", bearerTokenEnv: "BOOKX_MCP_TOKEN", lifecycle: "eager" },
+            },
+          }),
+        );
+        Object.assign(env, {
+          BOOKX_PI_EXTENSION: path.join(process.cwd(), "node_modules", "pi-mcp-adapter", "index.ts"),
+          BOOKX_PI_MCP_CONFIG: config,
+          BOOKX_MCP_TOKEN: mcp.token,
+          // The adapter's names, and pi 1.0's own MCP's (mcp__bookx__<tool>) should it take over.
+          BOOKX_PI_TOOLS: mcp.tools.flatMap((t) => [`mcp__${mcpName}_${t}`, `mcp__${mcpName}__${t}`]).join(","),
+        });
+      }
+      return env;
+    },
+    sessionMeta: () => undefined,
+  },
+} satisfies Record<AgentId, AgentPreset>;
+
+export const availableAgents = () => (Object.keys(AGENTS) as AgentId[]).filter((a) => AGENTS[a].available());
+
+/** Construct is on only when an agent can run here. */
+export const aiEnabled = () => availableAgents().length > 0;
+
+/** For a chat or setting whose agent can't run here: the first one that can (Claude Code when none can). */
+export const fallbackAgent = (): AgentId => availableAgents()[0] ?? DEFAULT_AGENT;
+
+export const AI_OFF = "Construct is off: install Claude Code or pi on the server running book-exporter, then restart it.";
+
+export const aiOffResponse = () => Response.json({ error: AI_OFF }, { status: 503 });
+
+/** A tool's own name (`render_pages`), from the agent's (`mcp__bookx__render_pages`, `mcp__bookx_render_pages`). */
+export function ownToolName(name: string, mcpName: string): string | null {
+  for (const prefix of [`mcp__${mcpName}__`, `mcp__${mcpName}_`]) if (name.startsWith(prefix)) return name.slice(prefix.length);
+  return null;
+}
+
+/** How to start `agent` for `ctx` (its folder made if missing): its command, environment and session options. */
+export async function launchFor(agent: AgentId, ctx: LaunchContext): Promise<AgentLaunch> {
+  const preset: AgentPreset = AGENTS[agent];
+  await mkdir(ctx.cwd, { recursive: true }); // pi's env() writes its MCP config there
+  return {
+    command: preset.command,
+    cwd: ctx.cwd,
+    env: await preset.env?.(ctx, MCP_NAME),
+    sessionMeta: preset.sessionMeta(ctx, MCP_NAME),
+  };
+}
+
+/** The tool a call is to, as the agent names it (`mcp__bookx__outline`), if it says. */
+export function toolNameOf(agent: AgentId, call: ToolCallLike): string | undefined {
+  const preset: AgentPreset = AGENTS[agent];
+  return preset.toolName?.(call) ?? (call.title?.startsWith("mcp__") ? call.title : undefined);
+}

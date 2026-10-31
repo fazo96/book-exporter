@@ -28,3 +28,4 @@ A web app that turns markdown books (as written in [pen](https://github.com/fazo
 | [docs/pipeline.md](docs/pipeline.md) | The export: assembling the source, `assets/book.lua`, the EPUB (CSS, fonts, cover, OPF patches, epubcheck), the PDF (`assets/book.typ`, `cfg`), custom files, verifying |
 | [docs/library.md](docs/library.md) | The library on disk (`lib/store.ts`), the settings (`lib/config.ts`), front and back matter, versions |
 | [docs/api.md](docs/api.md) | `app/api/projects/`: every route |
+| [docs/construct.md](docs/construct.md) | Construct, the AI typesetter (from pen): agents, tools, rendering pages, undo, the Notes |

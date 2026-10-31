@@ -1,0 +1,11 @@
+#!/bin/sh
+# pi as book-exporter's Construct runs it (from pen): pi-acp starts this
+# (PI_ACP_PI_COMMAND) in place of pi, with pi's own arguments (--mode rpc …),
+# and the app's settings in the environment (lib/construct/agents.ts). No
+# skills, prompt templates or AGENTS.md; Construct's system prompt; and only
+# book-exporter's tools, from pi-mcp-adapter, or none at all for probing models.
+set -- --no-skills --no-prompt-templates --no-context-files --system-prompt "$BOOKX_SYSTEM_PROMPT" "$@"
+if [ -n "$BOOKX_PI_TOOLS" ]; then
+  exec "${BOOKX_PI:-pi}" -e "$BOOKX_PI_EXTENSION" --mcp-config "$BOOKX_PI_MCP_CONFIG" --tools "$BOOKX_PI_TOOLS" "$@"
+fi
+exec "${BOOKX_PI:-pi}" --no-tools "$@"

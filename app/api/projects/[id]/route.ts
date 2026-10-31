@@ -1,3 +1,4 @@
+import { dropSession } from "@/lib/construct/session";
 import { badRequest, noContent, noStore, notFound, readJson, route } from "@/lib/route";
 import { deleteProject, projectExists, saveConfig } from "@/lib/store";
 import { projectView } from "@/lib/view";
@@ -20,6 +21,7 @@ export const PATCH = route<{ id: string }>(async (req, { id }) => {
 /** Move the book to the trash (BOOKX_DIR/.trash). */
 export const DELETE = route<{ id: string }>(async (_req, { id }) => {
   if (!(await projectExists(id))) return notFound();
+  dropSession(id);
   await deleteProject(id);
   return noContent();
 });
