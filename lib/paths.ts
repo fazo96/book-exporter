@@ -8,7 +8,7 @@ export const DATA_DIR = path.resolve(
 );
 
 // Where the faces a book can be set in live (colon-separated, like
-// TYPST_FONT_PATHS): `nix develop` sets it from flake.nix.
+// TYPST_FONT_PATHS): `nix develop` and the package set it from nix/deps.nix.
 export const FONT_PATHS = (process.env.BOOKX_FONT_PATHS ?? process.env.TYPST_FONT_PATHS ?? "").split(":").filter(Boolean);
 
 // The built-in filter and Typst library that every export uses.

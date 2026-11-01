@@ -13,52 +13,48 @@
         "aarch64-darwin"
       ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
-
-      # The faces a book can be set in. lib/fonts.ts lists them by family name
-      # and finds their files under BOOKX_FONT_PATHS: add one in both places.
-      fontsFor = pkgs: [
-        pkgs.eb-garamond
-        pkgs.crimson-pro
-        pkgs.libre-baskerville
-        pkgs.libre-caslon
-        pkgs.lora
-        pkgs.literata
-        pkgs.source-serif
-        pkgs.alegreya
-        pkgs.cormorant
-        pkgs.spectral
-        pkgs.vollkorn
-        pkgs.gentium-plus
-        pkgs.merriweather
-        pkgs.jost
-        pkgs.source-sans
-        pkgs.ibm-plex
-      ];
-
-      # The export pipeline: pandoc (with the Lua filters) writes the EPUB and
-      # the Typst source, typst sets the PDF, epubcheck validates the EPUB,
-      # resvg rasterizes SVG covers, imagemagick makes the store JPEG, zip/unzip
-      # patch the packaged EPUB, poppler counts the PDF's pages.
-      toolsFor = pkgs: [
-        pkgs.pandoc
-        pkgs.typst
-        pkgs.epubcheck
-        pkgs.resvg
-        pkgs.imagemagick
-        pkgs.zip
-        pkgs.unzip
-        pkgs.poppler-utils
-      ];
+      # Claude Code (Construct's Claude agent runs it) is unfree.
+      unfreePkgs =
+        system:
+        import nixpkgs {
+          inherit system;
+          config.allowUnfreePredicate = pkg: nixpkgs.lib.getName pkg == "claude-code";
+        };
     in
     {
+      # book-exporter and the agents it pins, from any nixpkgs (the NixOS
+      # module uses the system's).
+      lib.packagesFor =
+        pkgs:
+        let
+          claude-agent-acp = pkgs.callPackage ./nix/claude-agent-acp.nix { };
+          pi-acp = pkgs.callPackage ./nix/pi-acp.nix { };
+        in
+        {
+          inherit claude-agent-acp pi-acp;
+          book-exporter = pkgs.callPackage ./nix/package.nix { inherit claude-agent-acp pi-acp; };
+        };
+
+      packages = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-linux" ] (
+        system:
+        let
+          p = self.lib.packagesFor (unfreePkgs system);
+        in
+        p // { default = p.book-exporter; }
+      );
+
+      nixosModules.default = import ./nix/module.nix { inherit self; };
+
       devShells = forAllSystems (
         pkgs:
         let
-          fontPath = pkgs.lib.makeSearchPathOutput "out" "share/fonts" (fontsFor pkgs);
+          # The export's tools and fonts (nix/deps.nix), as the package pins them.
+          deps = import ./nix/deps.nix pkgs;
+          fontPath = pkgs.lib.makeSearchPathOutput "out" "share/fonts" deps.fonts;
         in
         {
           default = pkgs.mkShell {
-            packages = [ pkgs.nodejs_24 ] ++ toolsFor pkgs;
+            packages = [ pkgs.nodejs_24 ] ++ deps.tools;
             # Typst finds fonts through TYPST_FONT_PATHS; the app passes the same
             # folders to Typst itself and looks up EPUB font files in them.
             BOOKX_FONT_PATHS = fontPath;

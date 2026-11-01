@@ -36,11 +36,19 @@ Next 16 allows one `next dev` per checkout. To try something on a scratch librar
 
 ## Nix and the tools
 
-`flake.nix` has the dev shell only, for now (a package and a NixOS module like pen's are future work). The export runs `pandoc`, `typst`, `epubcheck`, `resvg` (SVG covers), `magick` (the store JPEG, WebP covers), `zip`/`unzip` (EPUB patches) and `pdfinfo` from `PATH`; a missing one fails its step with "not installed (run inside `nix develop`)".
+`flake.nix` has the dev shell, the package and a NixOS module ([hosting it](#hosting-it)); the export's tools and fonts are listed once, in `nix/deps.nix`, for both. The export runs `pandoc`, `typst`, `epubcheck`, `resvg` (SVG covers), `magick` (the store JPEG, WebP covers), `zip`/`unzip` (EPUB patches) and `pdfinfo` from `PATH`; a missing one fails its step with "not installed (run inside `nix develop`)".
+
+## Hosting it
+
+Like pen: `nix build` makes `result/bin/book-exporter`, which runs `next start` (it takes `--hostname` and `--port`) with the tools, the fonts and Construct's agents pinned (`nix/package.nix`: `BOOKX_CLAUDE`, `BOOKX_CONSTRUCT_CLAUDE`, `BOOKX_PI`, `BOOKX_CONSTRUCT_PI`; `nix/claude-agent-acp.nix` and `nix/pi-acp.nix` build the versions `lib/construct/agents.ts` pins, so bump them together). The library is `BOOKX_DIR`; the package itself is read-only.
+
+The flake's `nixosModules.default` adds `services.book-exporter` (`nix/module.nix`): `enable`, `host` (127.0.0.1), `port` (3400), `dataDir` (`BOOKX_DIR`, `/var/lib/book-exporter`), `user`/`group` (a `book-exporter` system user unless set: set them to a login user for Construct to use that user's Claude Code login and pi settings), `environment` and `environmentFile` (secrets such as `ANTHROPIC_API_KEY`). There's still no login, so put it behind something that keeps strangers out (a VPN-only virtual host), as above.
+
+To try the build without the module, on a scratch library: `BOOKX_DIR=/tmp/bookx-scratch result/bin/book-exporter --hostname 127.0.0.1 --port 3124`.
 
 ## Fonts
 
-The faces are nixpkgs font packages listed in `flake.nix` (`fontsFor`) and in `lib/fonts.ts`, which names each one's Typst family (`typst fonts` shows them: EB Garamond is "EB Garamond 12", Jost is "Jost*") and the static files the EPUB embeds (no variable fonts). To add one: add the package to the flake, its entry to `FONTS`, and check every file resolves (`lib/build/run.ts`'s `fontFiles()` follows symlinks: nix font folders are made of them, and `find -type f` misses those).
+The faces are nixpkgs font packages listed in `nix/deps.nix` (`fonts`) and in `lib/fonts.ts`, which names each one's Typst family (`typst fonts` shows them: EB Garamond is "EB Garamond 12", Jost is "Jost*") and the static files the EPUB embeds (no variable fonts). To add one: add the package to `nix/deps.nix`, its entry to `FONTS`, and check every file resolves (`lib/build/run.ts`'s `fontFiles()` follows symlinks: nix font folders are made of them, and `find -type f` misses those).
 
 ## The CLI
 

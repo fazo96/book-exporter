@@ -1,5 +1,5 @@
 // The faces a book can be set in: each comes from a nixpkgs font package
-// (flake.nix lists them) and is found by file name under BOOKX_FONT_PATHS.
+// (nix/deps.nix lists them) and is found by file name under BOOKX_FONT_PATHS.
 // `typst` is the family name Typst sees (`typst fonts`), which is not always
 // the CSS one: EB Garamond ships per optical size, Jost as "Jost*". `faces`
 // are the static files the EPUB embeds (no variable fonts: older readers

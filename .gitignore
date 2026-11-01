@@ -4,3 +4,5 @@ next-env.d.ts
 *.tsbuildinfo
 # the books themselves live here; keep them out of the code repo
 data/
+# nix build
+result
