@@ -1,6 +1,6 @@
 # Construct
 
-The AI side panel, ported from [pen](https://github.com/fazo96/pen)'s (its `docs/construct.md` has the history of the shared parts). Here it's a typesetter: it exports the book, looks at the pages, and changes the settings, the front and back matter, the custom files and the Notes with the writer. The manuscript is read-only to it.
+The AI side panel, ported from [pen](https://github.com/fazo96/pen)'s (its `docs/construct.md` has the history of the shared parts). Here it's a typesetter: it exports the book, looks at the pages, and changes the settings, the front and back matter, the custom files and the Notes with the writer. The manuscript and the attachments are read-only to it. So are the library's other books: it reads them, but only changes the one whose page it's on.
 
 ## Pieces
 
@@ -34,6 +34,7 @@ All of the agent's built-in tools are off: it gets only these, from `/api/constr
 
 | | |
 | --- | --- |
+| `list_books` | The library: each book's id, title, author, words and last export, this one marked |
 | `outline`, `read_manuscript`, `search_manuscript` | The manuscript, read-only. Reads are numbered lines of a section (`heading`) and/or from `offset` for `limit` lines, at most 2,000 lines or about 50,000 characters, ending with where to go on from (`excerpt`) |
 | `read_settings`, `update_settings` | The BookConfig, with a guide to its fields and the fonts. `update_settings` takes a partial `patch` through `saveConfig`, and answers with what `sanitizeConfig` clamped or ignored (`settingsDiffs`). It refuses to change the identifier, or to drop matter sections |
 | `read_matter`, `edit_matter`, `add_matter` | Front and back matter. Only the writer deletes a section |
@@ -45,6 +46,15 @@ All of the agent's built-in tools are off: it gets only these, from `/api/constr
 | `render_pages` | At most 8 pages of the last PDF through `pdftoppm` (60 dpi by default, at most 150), returned as MCP image content |
 | `find_in_pdf` | Which pages a phrase is on (`pdftotext`, whitespace folded) |
 | `read_epub` | The files in the last EPUB, or one of them (`unzip`) |
+| `list_attachments` | The [attachments](#attachments), with their type, size, PDF page count and caption |
+| `view_attachment` | An image, scaled to at most 1,568 px on its longest side (`magick`, as JPEG), or at most 8 pages of a PDF (`pdftoppm`, 60 dpi by default, at most 150), returned as MCP image content with the caption |
+| `read_attachment` | A PDF's text (`pdftotext`), numbered by line, with a `--- Page N ---` line where each page starts |
+
+### Other books
+
+Every tool that only reads takes `book`, another book's id (`bookProps` and `bookOf` in `tools/core.ts`): `bookOf` checks it's an id in the library (else the agent is pointed to `list_books`) and answers the chat's own book without it. The tools that write don't take it, so `readArgs` drops a `book` sent to one: the session's book is the only one that changes, and only it is snapshotted. To carry a style over, Construct reads it from the other book and makes it here.
+
+`render_pages` of another book keeps the pages with this book's renders, named `<export time>-p<page>-r<dpi>-<book>.png` (`renderName`); `rendersIn` reads the book back from the name (`Render.book`), and the panel's bigger view says whose page it is and links to that book instead of to this PDF.
 
 The edit tools replace `old_text` found exactly once (`replaceOnce`), or write the whole text without it. Every write calls `ctx.beforeChange()` first and `ctx.onChange(parts)` after. The session sends the parts to the page as a `changed` event, and the page reloads the book: drafts the writer hasn't touched since the last save take the new state; edited ones stay, with a banner (`constructChanged` in `Book.tsx`). Sending a message saves the page's drafts first.
 
@@ -58,6 +68,10 @@ Before a turn's first change, the session copies `project.json`, the matter, the
 
 `notes.md`, the Notes tab: free text, the art direction. They close the system prompt, cut at 20,000 characters. When the writer changes them, the new text goes ahead of the next message (`notesUpdate`). Construct's own edits don't count as news, and a compaction resets what the agent has seen to the system prompt's version. A copy of the book takes them.
 
+## Attachments
+
+Images and PDFs the writer adds below the Notes (`<id>/attachments/`, [library](library.md)) to show Construct what they're after: pages they like, another book's spread, a style guide. Each can have a caption saying what to look at. The system prompt lists them, with their captions, ahead of the Notes (`attachmentsText`); when the writer adds, captions or removes one, the new list goes ahead of the next message (`attachmentsUpdate`), and a compaction resets what the agent has seen, as for the Notes. Construct can't change them; its tools only look (`tools/attachments.ts`), working in a temporary folder that's removed after.
+
 ## Chats and models
 
 Chats are stored in `<id>/construct/<chat>.json` and resumed after a restart. Deleted ones go to `construct/trash/`. Titles, compaction, the context meter, the model and effort pickers, and pi's quirks all work as in pen.
@@ -66,4 +80,4 @@ The model picker lists every agent's models (`/api/construct/models`, kept 10 mi
 
 ## Verifying
 
-The tools are tested in `tests/construct-tools.test.ts`, including a real export and render when Typst, pandoc and poppler are on `PATH`. To try the panel, run a scratch library ([development](development.md)). The agent needs network access: `npx` fetches the ACP adapter on first use.
+The tools are tested in `tests/construct-tools.test.ts`, including a real export and render when Typst, pandoc and poppler are on `PATH`, and viewing and reading attachments when ImageMagick, poppler and Typst are. To try the panel, run a scratch library ([development](development.md)). The agent needs network access: `npx` fetches the ACP adapter on first use.

@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  addAttachment,
   addMatter,
   cloneProject,
   createProject,
+  deleteAttachment,
+  isValidAttachment,
+  listAttachments,
   listVersions,
   readConfig,
   readCustom,
@@ -11,6 +15,8 @@ import {
   readMatter,
   replaceManuscript,
   saveConfig,
+  setAttachmentCaption,
+  sniffAttachment,
   sniffCover,
   writeCustom,
   writeMatter,
@@ -72,4 +78,40 @@ test("a clone copies the book under -copy with a new identifier, but not its ver
   assert.equal(await readMatter(copy, "dedication"), "For you.");
   assert.equal(await readCustom(copy, "css"), "p { color: red }");
   assert.equal((await listVersions(copy)).length, 0);
+});
+
+test("attachments are typed by their bytes, named after their file, captioned, removed, and go with a copy", async () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0, 0, 0, 0, 0]);
+  assert.equal(sniffAttachment(png), "png");
+  assert.equal(sniffAttachment(new TextEncoder().encode("GIF89a……")), "gif");
+  assert.equal(sniffAttachment(new TextEncoder().encode("%PDF-1.7\n")), "pdf");
+  assert.equal(sniffAttachment(new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"/>')), null, "no SVG: it can carry script");
+  assert.equal(isValidAttachment("../project.json"), false);
+
+  const { id } = await createProject("# Attach Me\n\nOne.");
+  assert.equal(await addAttachment(id, png, "png", "My Spread (Penguin).PNG"), "my-spread-penguin.png");
+  assert.equal(await addAttachment(id, png, "png", "my spread penguin.png"), "my-spread-penguin-2.png");
+  assert.equal(await addAttachment(id, png, "pdf", ""), "attachment.pdf");
+  await setAttachmentCaption(id, "my-spread-penguin.png", "  The chapter opener.  ");
+  await assert.rejects(setAttachmentCaption(id, "nope.png", "x"), /not found/);
+  const list = await listAttachments(id);
+  assert.deepEqual(
+    list.map((a) => [a.name, a.ext, a.caption]).sort(),
+    [
+      ["attachment.pdf", "pdf", ""],
+      ["my-spread-penguin-2.png", "png", ""],
+      ["my-spread-penguin.png", "png", "The chapter opener."],
+    ],
+  );
+  await deleteAttachment(id, "my-spread-penguin-2.png");
+  const { id: copy } = await cloneProject(id);
+  assert.deepEqual(
+    (await listAttachments(copy)).map((a) => [a.name, a.caption]).sort(),
+    [
+      ["attachment.pdf", ""],
+      ["my-spread-penguin.png", "The chapter opener."],
+    ],
+  );
+  await setAttachmentCaption(id, "my-spread-penguin.png", "");
+  assert.equal((await listAttachments(id)).find((a) => a.name === "my-spread-penguin.png")?.caption, "");
 });

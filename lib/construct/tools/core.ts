@@ -1,5 +1,7 @@
 import "server-only";
+import { isValidId } from "../../ids";
 import { headings } from "../../manuscript";
+import { projectExists } from "../../store";
 import type { BookPart, ToolName } from "../types";
 
 // What every tool is made of (from pen): its JSON schema, which is both what
@@ -132,6 +134,19 @@ export function tool<const P extends Props, const R extends keyof P & string = n
     readOnly: t.readOnly,
     run: (input, ctx) => t.run(readArgs(t.properties, required, input), ctx),
   };
+}
+
+// ─── Other books ─────────────────────────────────────────────
+
+/** The argument of the tools that read: another book of the library instead of this one. */
+export const bookProps = { book: str("Another book's id (list_books), to read it instead of this one.") };
+
+/** The book a read is of: `book` if given (and in the library), else the chat's own. */
+export async function bookOf(args: { book?: string }, ctx: ToolContext): Promise<string> {
+  const { book } = args;
+  if (!book || book === ctx.projectId) return ctx.projectId;
+  if (!isValidId(book) || !(await projectExists(book))) throw new ToolError(`No book "${book}" in the library: list_books lists them.`);
+  return book;
 }
 
 // ─── Reading text ────────────────────────────────────────────

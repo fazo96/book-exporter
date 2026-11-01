@@ -6,19 +6,20 @@ import { promisify } from "node:util";
 import { type BuildEvent, buildProject, isBuilding } from "../../build";
 import type { Format } from "../../build/assemble";
 import { buildLogFile, distFile, readBuildInfo, rendersDir } from "../../store";
-import { renderedPage } from "../transcript";
+import { renderedPage, renderName } from "../transcript";
 import type { Render } from "../types";
-import { bool, excerpt, int, rangeProps, someOf, str, type Tool, ToolError, type ToolOutput, tool } from "./core";
+import { bookOf, bookProps, bool, excerpt, int, rangeProps, someOf, str, type Tool, ToolError, type ToolOutput, tool } from "./core";
 
 // Exporting the book and looking at what came out: the PDF's pages as images
 // (pdftoppm), where text landed (pdftotext), the EPUB's files (unzip). The
 // pages are kept in construct/renders/, so the panel shows the writer the
-// same pages the agent saw.
+// same pages the agent saw. The reads take `book`, for another book's last
+// export; its pages are kept with this book's renders, named after it.
 
 const run = promisify(execFile);
 
 /** Run `cmd` and answer its output; failing, a ToolError with what it said. */
-async function exec(cmd: string, args: string[]): Promise<string> {
+export async function exec(cmd: string, args: string[]): Promise<string> {
   try {
     return (await run(cmd, args, { maxBuffer: 64 * 1024 * 1024, encoding: "utf8", timeout: 120_000 })).stdout;
   } catch (err) {
@@ -82,10 +83,10 @@ const exportTool = tool({
 const buildLogTool = tool({
   name: "read_build_log",
   description: "Read the last export's log, numbered by line; `problems` for just its warnings and errors.",
-  properties: { problems: bool("Only the warnings and errors."), ...rangeProps },
+  properties: { problems: bool("Only the warnings and errors."), ...rangeProps, ...bookProps },
   readOnly: true,
-  async run({ problems, ...range }, ctx) {
-    const log = await readFile(buildLogFile(ctx.projectId), "utf8").catch(() => null);
+  async run({ problems, book, ...range }, ctx) {
+    const log = await readFile(buildLogFile(await bookOf({ book }, ctx)), "utf8").catch(() => null);
     if (log === null) throw new ToolError("There's no export yet.");
     const text = problems ? log.split("\n").filter((l) => /^\[(warn|error)\]/.test(l)).join("\n") : log;
     return text.trim() ? excerpt(text, range) : "No warnings or errors.";
@@ -94,8 +95,8 @@ const buildLogTool = tool({
 
 // ─── The PDF's pages ─────────────────────────────────────────
 
-const MAX_PAGES = 8;
-const DPI = { default: 60, max: 150 };
+export const MAX_PAGES = 8;
+export const DPI = { default: 60, max: 150 };
 
 /** "1-3, 8" → [1, 2, 3, 8], within the PDF's `count` pages, at most MAX_PAGES. */
 export function parsePages(spec: string, count: number): number[] {
@@ -126,11 +127,12 @@ async function prune(dir: string, keep: Set<string>) {
 const renderTool = tool({
   name: "render_pages",
   description: `Look at pages of the last exported PDF: they come back as images. Pages are numbered from the PDF's first (its cover or title page), not by folio. At most ${MAX_PAGES} at a time; dpi ${DPI.default} by default (enough to judge a layout), up to ${DPI.max} for a detail. A spread is an even page and the odd one after it.`,
-  properties: { pages: str('Pages: "5", "1-4", "10, 11, 24".'), dpi: int(`Resolution (default ${DPI.default}, at most ${DPI.max}).`) },
+  properties: { pages: str('Pages: "5", "1-4", "10, 11, 24".'), dpi: int(`Resolution (default ${DPI.default}, at most ${DPI.max}).`), ...bookProps },
   required: ["pages"],
   readOnly: true,
-  async run({ pages, dpi = DPI.default }, ctx): Promise<ToolOutput> {
-    const { file, info } = await output(ctx.projectId, "pdf");
+  async run({ pages, dpi = DPI.default, book }, ctx): Promise<ToolOutput> {
+    const id = await bookOf({ book }, ctx);
+    const { file, info } = await output(id, "pdf");
     const count = info.pdfPages ?? Number((await exec("pdfinfo", [file])).match(/^Pages:\s+(\d+)/m)?.[1] ?? 0);
     const list = parsePages(pages, count);
     const r = Math.min(Math.max(dpi, 20), DPI.max);
@@ -140,7 +142,7 @@ const renderTool = tool({
     const renders: Render[] = [];
     const images: ToolOutput["images"] = [];
     for (const page of list) {
-      const name = `${stamp}-p${page}-r${r}`;
+      const name = renderName(stamp, page, r, id === ctx.projectId ? undefined : id);
       const png = path.join(dir, `${name}.png`);
       let data = await readFile(png).catch(() => null);
       if (!data) {
@@ -152,7 +154,7 @@ const renderTool = tool({
     }
     await prune(dir, new Set([stamp]));
     return {
-      text: `${count} pages in the PDF exported ${new Date(info.at).toISOString()}.\n${renders.map(renderedPage).join("\n")}`,
+      text: `${count} pages in the PDF${id === ctx.projectId ? "" : ` of ${id}`} exported ${new Date(info.at).toISOString()}.\n${renders.map(renderedPage).join("\n")}`,
       images,
     };
   },
@@ -164,11 +166,11 @@ const fold = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
 const findTool = tool({
   name: "find_in_pdf",
   description: "Which pages of the last exported PDF some text is on (case-insensitive; a phrase broken across lines still matches, one broken across pages doesn't).",
-  properties: { text: str("The text to look for.") },
+  properties: { text: str("The text to look for."), ...bookProps },
   required: ["text"],
   readOnly: true,
-  async run({ text }, ctx) {
-    const { file } = await output(ctx.projectId, "pdf");
+  async run({ text, book }, ctx) {
+    const { file } = await output(await bookOf({ book }, ctx), "pdf");
     const pages = (await exec("pdftotext", ["-layout", file, "-"])).split("\f");
     const q = fold(text);
     const hits: string[] = [];
@@ -188,10 +190,10 @@ const findTool = tool({
 const readEpubTool = tool({
   name: "read_epub",
   description: "The last exported EPUB: without `path`, the files in it; with it, one text file (XHTML, CSS, OPF, nav), numbered by line.",
-  properties: { path: str("A file in the EPUB, as listed (e.g. EPUB/text/ch001.xhtml)."), ...rangeProps },
+  properties: { path: str("A file in the EPUB, as listed (e.g. EPUB/text/ch001.xhtml)."), ...rangeProps, ...bookProps },
   readOnly: true,
-  async run({ path: inside, ...range }, ctx) {
-    const { file } = await output(ctx.projectId, "epub");
+  async run({ path: inside, book, ...range }, ctx) {
+    const { file } = await output(await bookOf({ book }, ctx), "epub");
     const names = (await exec("unzip", ["-Z1", file])).split("\n").filter(Boolean);
     if (!inside) return names.join("\n");
     if (!names.includes(inside)) throw new ToolError(`No "${inside}" in the EPUB: call read_epub without a path to list them.`);

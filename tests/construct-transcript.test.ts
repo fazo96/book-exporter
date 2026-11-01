@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { SessionNotification } from "@agentclientprotocol/sdk";
 import { chatTitle, cleanChatName } from "../lib/construct/chats.ts";
-import { renderedPage, rendersIn, settled, Transcript, type TurnState } from "../lib/construct/transcript.ts";
+import { renderedPage, renderName, rendersIn, settled, Transcript, type TurnState } from "../lib/construct/transcript.ts";
 import type { ChatItem } from "../lib/construct/types.ts";
 
 // A Construct chat's transcript and how the agent's updates change it
@@ -83,6 +83,9 @@ test("tool calls are one item, updated as they run; the pages a render showed co
   // The tool call ended the message before it.
   assert.equal(log.items[2].type === "agent" && log.items[2].text, "Done.");
   assert.deepEqual(rendersIn({ content: [{ text: renderedPage({ page: 1, file: "a-p1-r60.png" }) }] }), [{ page: 1, file: "a-p1-r60.png" }]);
+  assert.deepEqual(rendersIn(renderedPage({ page: 2, file: `${renderName("a", 2, 60, "other-book")}.png` })), [
+    { page: 2, file: "a-p2-r60-other-book.png", book: "other-book" },
+  ]);
   assert.equal(rendersIn("Saved."), null);
   assert.equal(rendersIn(undefined), null);
 });

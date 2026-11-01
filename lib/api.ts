@@ -34,6 +34,11 @@ export const api = {
   saveNotes: async (id: string, text: string) => void (await check(await fetch(`${base(id)}/notes`, json("PUT", { text })))),
   uploadCover: async (id: string, file: Blob) => void (await check(await fetch(`${base(id)}/cover`, { method: "PUT", body: file }))),
   deleteCover: async (id: string) => void (await check(await fetch(`${base(id)}/cover`, { method: "DELETE" }))),
+  addAttachment: async (id: string, file: File) =>
+    (await (await check(await fetch(`${base(id)}/attachments?name=${encodeURIComponent(file.name)}`, { method: "POST", body: file }))).json()) as { name: string },
+  captionAttachment: async (id: string, name: string, caption: string) =>
+    void (await check(await fetch(`${base(id)}/attachments/${name}`, json("PATCH", { caption })))),
+  deleteAttachment: async (id: string, name: string) => void (await check(await fetch(`${base(id)}/attachments/${name}`, { method: "DELETE" }))),
   build: async (id: string, formats: string[]) => check(await fetch(`${base(id)}/build`, json("POST", { formats }))),
   clone: async (id: string) => (await (await check(await fetch(`${base(id)}/clone`, { method: "POST" }))).json()) as { id: string },
   pull: async <T,>(id: string) => (await (await check(await fetch(`${base(id)}/pen/pull`, { method: "POST" }))).json()) as T,

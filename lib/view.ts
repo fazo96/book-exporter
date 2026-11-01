@@ -3,7 +3,7 @@ import "server-only";
 import { isBuilding } from "@/lib/build";
 import { countWords, outline } from "@/lib/manuscript";
 import { aiEnabled } from "@/lib/construct/agents";
-import { listVersions, readBuildInfo, readConfig, readCover, readCustom, readManuscript, readMatter, readNotes, readPenLink } from "@/lib/store";
+import { listAttachments, listVersions, readBuildInfo, readConfig, readCover, readCustom, readManuscript, readMatter, readNotes, readPenLink } from "@/lib/store";
 
 /** Everything the book's page shows, in one answer. */
 export async function projectView(id: string) {
@@ -26,6 +26,7 @@ export async function projectView(id: string) {
     matter,
     custom: { css: await readCustom(id, "css"), typ: await readCustom(id, "typ"), lua: await readCustom(id, "lua") },
     notes: await readNotes(id),
+    attachments: await listAttachments(id),
     /** Construct can run here (an agent was found). */
     ai: aiEnabled(),
   };

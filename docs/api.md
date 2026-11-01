@@ -16,6 +16,8 @@
 | `PUT` / `DELETE /api/projects/<id>/matter/<mid>` | Save a section's text `{ body }` / delete it |
 | `PUT /api/projects/<id>/custom/<css\|typ\|lua>` `{ text }` | Save a custom file (empty removes it) |
 | `PUT /api/projects/<id>/notes` `{ text }` | Save the Notes (empty removes them) |
+| `GET` / `POST /api/projects/<id>/attachments` | The [attachments](library.md#attachments) / add one: the file as the body, `?name=` its file name → 201 `{ name }`; 413 over 20 MB, 400 when it isn't a PNG, JPEG, WebP, GIF or PDF |
+| `GET` / `PATCH` / `DELETE /api/projects/<id>/attachments/<name>` | Serve one (inline) / set its caption `{ caption }` (empty removes it) / remove it |
 | `GET /api/projects/<id>/construct` | Construct's conversation, as server-sent events: a snapshot, then every change (`ConstructEvent`) ([Construct](construct.md)) |
 | `POST /api/projects/<id>/construct` `{ action, … }` | Drive it (`ConstructAction`: start, prompt, cancel, compact, reset, chats, model, revert); answers 204, 409 while it's answering, 503 when Construct is off |
 | `GET /api/projects/<id>/construct/renders/<file>` | A page Construct rendered |

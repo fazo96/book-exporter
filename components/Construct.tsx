@@ -303,12 +303,26 @@ export default function Construct({ projectId, open, onClose, getContext, before
         <div className="render-view" onClick={(e) => e.target === e.currentTarget && setViewing(null)}>
           <img src={renderUrl(viewing.file)} alt={`Page ${viewing.page}`} />
           <p>
-            <span>Page {viewing.page}, as Construct saw it{pdf && !viewing.file.startsWith(`${pdf.at.toString(36)}-`) && " (an earlier export)"}</span>
-            {/* Renders are named by their export's time: an older one's page may be elsewhere in today's PDF. */}
-            {pdf && viewing.file.startsWith(`${pdf.at.toString(36)}-`) && (
-              <a href={`${pdf.url}#page=${viewing.page}`} target="_blank" rel="noreferrer">
-                Open the PDF at this page
-              </a>
+            {viewing.book ? (
+              // A page of another book of the library, which Construct looked at for its style.
+              <>
+                <span>
+                  Page {viewing.page} of {viewing.book}, as Construct saw it
+                </span>
+                <a href={`/b/${viewing.book}#export`} target="_blank" rel="noreferrer">
+                  Open that book
+                </a>
+              </>
+            ) : (
+              <>
+                <span>Page {viewing.page}, as Construct saw it{pdf && !viewing.file.startsWith(`${pdf.at.toString(36)}-`) && " (an earlier export)"}</span>
+                {/* Renders are named by their export's time: an older one's page may be elsewhere in today's PDF. */}
+                {pdf && viewing.file.startsWith(`${pdf.at.toString(36)}-`) && (
+                  <a href={`${pdf.url}#page=${viewing.page}`} target="_blank" rel="noreferrer">
+                    Open the PDF at this page
+                  </a>
+                )}
+              </>
             )}
             <button type="button" className="link" onClick={() => setViewing(null)}>
               Close

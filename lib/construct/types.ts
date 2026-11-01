@@ -5,6 +5,7 @@ import type { AgentId } from "./agentInfo.ts";
 
 /** Construct's tools, as its agent calls them (served by ./tools/, described in the panel by ConstructItem.tsx). */
 export type ToolName =
+  | "list_books"
   | "outline"
   | "read_manuscript"
   | "search_manuscript"
@@ -22,7 +23,10 @@ export type ToolName =
   | "read_build_log"
   | "render_pages"
   | "find_in_pdf"
-  | "read_epub";
+  | "read_epub"
+  | "list_attachments"
+  | "view_attachment"
+  | "read_attachment";
 
 /** What a tool changed, so the book's page can reload it. */
 export type BookPart = "settings" | "matter" | "custom" | "notes" | "export";
@@ -32,8 +36,8 @@ export type PromptContext = {
   tab?: string;
 };
 
-/** A page Construct rendered: its number and the PNG's name in construct/renders/. */
-export type Render = { page: number; file: string };
+/** A page Construct rendered: its number, the PNG's name in construct/renders/, and the book it's of when it's another one. */
+export type Render = { page: number; file: string; book?: string };
 
 export type ChatItem =
   | {

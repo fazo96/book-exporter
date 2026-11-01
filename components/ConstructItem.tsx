@@ -17,6 +17,7 @@ function linesOf(i: Record<string, string>) {
 
 /** What each tool did, from the bits of its input the session keeps (`brief`). */
 const TOOL_TEXT: Record<ToolName, (i: Record<string, string>, lines: string) => string> = {
+  list_books: () => "Looked through the library",
   outline: () => "Read the outline",
   read_manuscript: (i, lines) => `Read ${i.heading ?? "the manuscript"}${lines}`,
   search_manuscript: (i) => (i.query ? `Searched the manuscript for “${i.query}”` : "Searched the manuscript"),
@@ -35,12 +36,16 @@ const TOOL_TEXT: Record<ToolName, (i: Record<string, string>, lines: string) => 
   render_pages: (i) => (i.pages ? `Looked at page${/[-,\s]/.test(i.pages) ? "s" : ""} ${i.pages}` : "Looked at the PDF"),
   find_in_pdf: (i) => (i.text ? `Looked for “${i.text}” in the PDF` : "Searched the PDF"),
   read_epub: (i, lines) => (i.path ? `Read ${i.path.split("/").pop()} in the EPUB${lines}` : "Looked through the EPUB"),
+  list_attachments: () => "Looked through the attachments",
+  view_attachment: (i) => `Looked at ${i.name ?? "an attachment"}${i.pages ? ` (page${/[-,\s]/.test(i.pages) ? "s" : ""} ${i.pages})` : ""}`,
+  read_attachment: (i, lines) => `Read ${i.name ?? "an attachment"}${lines}`,
 };
 
 function describeTool(item: Extract<ChatItem, { type: "tool" }>): string {
   const i = item.input ?? {};
   const describe = item.name && Object.hasOwn(TOOL_TEXT, item.name) ? TOOL_TEXT[item.name as ToolName] : null;
-  return describe ? describe(i, linesOf(i)) : item.title;
+  if (!describe) return item.title;
+  return `${describe(i, linesOf(i))}${i.book ? `, in ${i.book}` : ""}`;
 }
 
 type Props = {
@@ -95,7 +100,7 @@ export default function ConstructItem({ item, renderUrl, onOpenRender, onRevert 
           {item.renders && (
             <div className="construct-renders">
               {item.renders.map((r) => (
-                <button key={r.file} type="button" onClick={() => onOpenRender(r)} title={`Page ${r.page}`}>
+                <button key={r.file} type="button" onClick={() => onOpenRender(r)} title={`Page ${r.page}${r.book ? ` of ${r.book}` : ""}`}>
                   <img src={renderUrl(r.file)} alt={`Page ${r.page}`} loading="lazy" />
                   <span>{r.page}</span>
                 </button>

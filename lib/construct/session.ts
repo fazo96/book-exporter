@@ -12,13 +12,13 @@ import type {
   SessionNotification,
 } from "@agentclientprotocol/sdk";
 import { type AgentLaunch, type AgentProcess, initialize, modelOption, optionValues, spawnAgent, startupInfoOf } from "../acp";
-import { readChats, readConfig, readNotes, restoreSnapshot, snapshotBook, trashChat, writeChat } from "../store";
+import { listAttachments, readChats, readConfig, readNotes, restoreSnapshot, snapshotBook, trashChat, writeChat } from "../store";
 import { listTools, type ToolContext } from "./tools";
 import { DEFAULT_AGENT } from "./agentInfo";
 import { type AgentId, type AgentPreset, AGENTS, fallbackAgent, isAgentId, launchFor, MCP_NAME, ownToolName, toolNameOf } from "./agents";
 import { type ChatNames, chatTitle, cleanChatName, isStoredChat, metaOf, newChatId, type StoredChat } from "./chats";
 import { modelForChats, rememberModel } from "./probe";
-import { describeContext, notesText, notesUpdate, revertUpdate, systemPrompt } from "./prompts";
+import { attachmentsText, attachmentsUpdate, describeContext, notesText, notesUpdate, revertUpdate, systemPrompt } from "./prompts";
 import { type Change, settled, Transcript, visibleConfig } from "./transcript";
 import type { BookPart, ChatItem, ChatMeta, ConstructEvent, ConstructState, PromptContext } from "./types";
 
@@ -51,6 +51,9 @@ class ConstructSession {
   /** The Notes in the system prompt, and as the agent last saw them (an update can follow). */
   private notesLaunched: string | null = null;
   private notesSeen: string | null = null;
+  /** The same for the attachments, as attachmentsText lists them. */
+  private attachmentsLaunched: string | null = null;
+  private attachmentsSeen: string | null = null;
   /** The writer put the book back since the agent last heard: the message it was put back to. */
   private reverted: string | null = null;
   /** The message whose turn is running, and whether it has snapshotted the book yet. */
@@ -338,11 +341,13 @@ class ConstructSession {
       const config = await readConfig(this.projectId);
       const notes = await this.readNotes();
       this.notesLaunched = this.notesSeen = notes;
+      const attachments = await this.readAttachments();
+      this.attachmentsLaunched = this.attachmentsSeen = attachments;
       this.reverted = null;
       const mcpUrl = `${this.baseUrl}/api/construct/mcp`;
       const launch = await launchFor(agent, {
         cwd: path.join(os.tmpdir(), "bookx-construct", this.projectId),
-        systemPrompt: systemPrompt(config?.metadata.title || this.projectId, notes),
+        systemPrompt: systemPrompt(config?.metadata.title || this.projectId, notes, attachments),
         mcp: { url: mcpUrl, token: this.token, tools: listTools().map((t) => t.name) },
       });
       this.launched = { ...launch, mcpUrl };
@@ -476,6 +481,7 @@ class ConstructSession {
         // After the agent started, which read the Notes into its system prompt.
         ...this.revertChange(),
         ...(await this.notesChange()),
+        ...(await this.attachmentsChange()),
         ...(where ? [{ type: "text" as const, text: where }] : []),
         { type: "text", text },
       ],
@@ -510,6 +516,16 @@ class ConstructSession {
   }
 
   private readNotes = async () => notesText(await readNotes(this.projectId));
+
+  /** The attachments, if the writer changed them since the agent last heard: as a block to send ahead of a message. */
+  private async attachmentsChange(): Promise<ContentBlock[]> {
+    const attachments = await this.readAttachments();
+    if (attachments === this.attachmentsSeen) return [];
+    this.attachmentsSeen = attachments;
+    return [{ type: "text", text: attachmentsUpdate(attachments) }];
+  }
+
+  private readAttachments = async () => attachmentsText(await listAttachments(this.projectId));
 
   /** One turn: start the agent if needed, send `prompt`, wait for the end; failures become notices. */
   private async runTurn(
@@ -590,8 +606,11 @@ class ConstructSession {
       },
     });
     for (const change of changes) this.tell(change);
-    // A compaction may drop a Notes update sent with a message; the system prompt's version stays.
-    if (u.sessionUpdate === "compaction_update") this.notesSeen = this.notesLaunched;
+    // A compaction may drop a Notes (or attachments) update sent with a message; the system prompt's version stays.
+    if (u.sessionUpdate === "compaction_update") {
+      this.notesSeen = this.notesLaunched;
+      this.attachmentsSeen = this.attachmentsLaunched;
+    }
   }
 }
 

@@ -1,18 +1,20 @@
 import "server-only";
+import { attachmentTools } from "./attachments";
 import { bookTools } from "./book";
 import { type Tool, type ToolContext, ToolError, type ToolOutput } from "./core";
 import { previewTools } from "./preview";
 
 // Everything Construct can do, and nothing more. The agent's own file, shell
 // and web tools are switched off; these are served to it over MCP (see
-// ../mcp.ts). The manuscript is read-only by construction: no tool here
-// writes it. What they write is the book's settings, matter, custom files and
-// Notes, through lib/store.ts, and its exports. Each tool's schema is also
-// what its arguments are checked against (core.ts).
+// ../mcp.ts). The manuscript and the attachments are read-only by
+// construction: no tool here writes them. What they write is the book's
+// settings, matter, custom files and Notes, through lib/store.ts, and its
+// exports; never another book's, which they only read. Each tool's schema is
+// also what its arguments are checked against (core.ts).
 
 export type { ToolContext } from "./core";
 
-const TOOLS: Tool[] = [...bookTools, ...previewTools];
+const TOOLS: Tool[] = [...bookTools, ...previewTools, ...attachmentTools];
 
 /** As the agent sees them. */
 export function listTools() {

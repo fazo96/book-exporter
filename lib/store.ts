@@ -23,6 +23,8 @@ import { queue } from "./queue";
 //   <id>/dist/            the last export, and build.json about it
 //   <id>/pen.json         the pen book it pulls its manuscript from (lib/pen.ts)
 //   <id>/notes.md         the writer's notes: the art direction Construct follows
+//   <id>/attachments/     images and PDFs for Construct to look at
+//   <id>/attachments.json their captions
 //   <id>/construct/       Construct's chats, snapshots and rendered pages
 //
 // Deletes move a folder to .trash/. Every read-modify-write of a project goes
@@ -32,11 +34,15 @@ export const MAX_MANUSCRIPT = 10 * 1024 * 1024;
 export const MAX_COVER = 20 * 1024 * 1024;
 export const MAX_CUSTOM = 512 * 1024;
 export const MAX_NOTES = 512 * 1024;
+export const MAX_ATTACHMENT = 20 * 1024 * 1024;
+export const MAX_CAPTION = 2000;
 
 export type CustomKind = "css" | "typ" | "lua";
 const CUSTOM_FILES: Record<CustomKind, string> = { css: "custom.css", typ: "custom.typ", lua: "filter.lua" };
 export const COVER_TYPES = { png: "image/png", jpg: "image/jpeg", webp: "image/webp", svg: "image/svg+xml" } as const;
 export type CoverExt = keyof typeof COVER_TYPES;
+export const ATTACHMENT_TYPES = { png: "image/png", jpg: "image/jpeg", webp: "image/webp", gif: "image/gif", pdf: "application/pdf" } as const;
+export type AttachmentExt = keyof typeof ATTACHMENT_TYPES;
 
 export const dirOf = (id: string) => {
   if (!isValidId(id)) throw new Error(`invalid id: ${id}`);
@@ -160,8 +166,8 @@ async function claimId(base: string, config: BookConfig, suffix: (n: number) => 
 
 /**
  * A copy of a book to take elsewhere (another edition, an experiment): its
- * settings, manuscript, matter, custom files, notes, cover and pen link, with
- * a new identifier (stores and readers tell editions apart by it). Not its
+ * settings, manuscript, matter, custom files, notes, attachments, cover and pen link,
+ * with a new identifier (stores and readers tell editions apart by it). Not its
  * versions, exports or Construct's chats.
  */
 export async function cloneProject(id: string): Promise<{ id: string }> {
@@ -178,6 +184,9 @@ export async function cloneProject(id: string): Promise<{ id: string }> {
     }
     const cover = await readCover(id);
     if (cover) await writeAtomic(fileOf(to, `cover.${cover.ext}`), await readFile(cover.file));
+    const captions = await readText(fileOf(id, "attachments.json"));
+    if (captions !== null) await writeAtomic(fileOf(to, "attachments.json"), captions);
+    for (const a of await listAttachments(id)) await writeAtomic(fileOf(to, "attachments", a.name), await readFile(fileOf(id, "attachments", a.name)));
     return { id: to };
   });
 }
@@ -443,6 +452,98 @@ export function writeCover(id: string, data: Uint8Array, ext: CoverExt): Promise
 export function deleteCover(id: string): Promise<void> {
   return run(id)(async () => {
     for (const ext of Object.keys(COVER_TYPES)) await unlink(fileOf(id, `cover.${ext}`)).catch(() => {});
+  });
+}
+
+// --------------------------------------------------------------- attachments
+
+/** An image or PDF the writer added for Construct to look at: a style to follow, pages they like. */
+export interface Attachment {
+  name: string;
+  ext: AttachmentExt;
+  size: number;
+  caption: string;
+  addedAt: number;
+}
+
+const ATTACHMENT_RE = /^[a-z0-9][a-z0-9-]{0,79}\.(png|jpg|webp|gif|pdf)$/;
+export const isValidAttachment = (n: unknown): n is string => typeof n === "string" && ATTACHMENT_RE.test(n);
+
+/** An attachment's type from its first bytes, or null when it isn't an image or a PDF. */
+export function sniffAttachment(data: Uint8Array): AttachmentExt | null {
+  const head = new TextDecoder().decode(data.slice(0, 6));
+  if (head === "GIF87a" || head === "GIF89a") return "gif";
+  if (head.startsWith("%PDF-")) return "pdf";
+  const image = sniffCover(data);
+  return image === "svg" ? null : image;
+}
+
+/** Captions by attachment name; anything malformed is dropped. */
+async function readCaptions(id: string): Promise<Record<string, string>> {
+  try {
+    const raw = JSON.parse((await readText(fileOf(id, "attachments.json"))) ?? "{}") as Record<string, { caption?: unknown } | null>;
+    const out: Record<string, string> = {};
+    for (const [name, v] of Object.entries(raw)) if (isValidAttachment(name) && typeof v?.caption === "string") out[name] = v.caption;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+const writeCaptions = (id: string, captions: Record<string, string>) =>
+  writeAtomic(fileOf(id, "attachments.json"), `${JSON.stringify(Object.fromEntries(Object.entries(captions).map(([n, caption]) => [n, { caption }])), null, 2)}\n`);
+
+/** The book's attachments, oldest first. */
+export async function listAttachments(id: string): Promise<Attachment[]> {
+  const captions = await readCaptions(id);
+  const out: Attachment[] = [];
+  for (const name of await readdir(fileOf(id, "attachments")).catch(() => [] as string[])) {
+    if (!isValidAttachment(name)) continue;
+    const s = await stat(fileOf(id, "attachments", name)).catch(() => null);
+    if (!s?.isFile()) continue;
+    out.push({ name, ext: name.split(".").pop() as AttachmentExt, size: s.size, caption: captions[name] ?? "", addedAt: Math.round(s.mtimeMs) });
+  }
+  return out.sort((a, b) => a.addedAt - b.addedAt || a.name.localeCompare(b.name));
+}
+
+export async function attachmentFile(id: string, name: string): Promise<string | null> {
+  if (!isValidAttachment(name)) return null;
+  const file = fileOf(id, "attachments", name);
+  return (await stat(file).catch(() => null))?.isFile() ? file : null;
+}
+
+/** Add an attachment named after the file it came from (slugified, with -2, -3… when taken) → its name. */
+export async function addAttachment(id: string, data: Uint8Array, ext: AttachmentExt, filename: string): Promise<string> {
+  const stem = slugify(filename.replace(/\.[^.]*$/, ""), "attachment").slice(0, 70).replace(/-+$/, "");
+  for (let n = 1; ; n++) {
+    const name = `${stem}${n > 1 ? `-${n}` : ""}.${ext}`;
+    if (await createExclusive(fileOf(id, "attachments", name), data)) return name;
+  }
+}
+
+/** Set an attachment's caption (empty removes it). */
+export function setAttachmentCaption(id: string, name: string, caption: string): Promise<void> {
+  return run(id)(async () => {
+    if (!(await attachmentFile(id, name))) throw new Error("not found");
+    const captions = await readCaptions(id);
+    const text = caption.trim();
+    if (text) captions[name] = text;
+    else delete captions[name];
+    await writeCaptions(id, captions);
+  });
+}
+
+export function deleteAttachment(id: string, name: string): Promise<void> {
+  return run(id)(async () => {
+    if (!isValidAttachment(name)) throw new Error("not found");
+    await unlink(fileOf(id, "attachments", name)).catch((err: NodeJS.ErrnoException) => {
+      if (err.code !== "ENOENT") throw err;
+    });
+    const captions = await readCaptions(id);
+    if (Object.hasOwn(captions, name)) {
+      delete captions[name];
+      await writeCaptions(id, captions);
+    }
   });
 }
 

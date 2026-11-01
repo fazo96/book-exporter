@@ -11,6 +11,7 @@ import { ASSETS_DIR } from "../../paths";
 import {
   addMatter,
   type CustomKind,
+  listProjects,
   MAX_CUSTOM,
   MAX_NOTES,
   readConfig,
@@ -23,11 +24,13 @@ import {
   writeMatter,
   writeNotes,
 } from "../../store";
-import { bool, excerpt, obj, oneOf, rangeProps, replaceOnce, sectionsOf, str, type Tool, ToolError, text, tool } from "./core";
+import { bookOf, bookProps, bool, excerpt, obj, oneOf, rangeProps, replaceOnce, sectionsOf, str, type Tool, ToolError, text, tool } from "./core";
 
 // The book: its manuscript (read-only), settings, front and back matter,
 // custom files and Notes. Everything here writes through lib/store.ts, inside
-// the book's folder, after the session's snapshot (ctx.beforeChange).
+// the book's folder, after the session's snapshot (ctx.beforeChange). The
+// reads take `book`, to read another book of the library (bookOf); the
+// writes are only ever to the chat's own.
 
 async function config(id: string) {
   const c = await readConfig(id);
@@ -35,17 +38,37 @@ async function config(id: string) {
   return c;
 }
 
+// ─── The library ─────────────────────────────────────────────
+
+const listBooksTool = tool({
+  name: "list_books",
+  description:
+    "The library's other books, which every reading tool can read with `book`: their settings, custom files, Notes, attachments and last export. To carry a style over from one, read it there and make the change here.",
+  properties: {},
+  readOnly: true,
+  async run(_, ctx) {
+    const books = await listProjects();
+    return books
+      .map((b) => {
+        const built = b.lastBuild ? `exported ${new Date(b.lastBuild.at).toISOString().slice(0, 10)}${b.lastBuild.pdfPages ? `, ${b.lastBuild.pdfPages} PDF pages` : ""}` : "never exported";
+        return `${b.id}${b.id === ctx.projectId ? " (this book)" : ""}: "${b.title}"${b.author ? ` by ${b.author}` : ""}, ${b.words.toLocaleString("en")} words, ${built}`;
+      })
+      .join("\n");
+  },
+});
+
 // ─── The manuscript ──────────────────────────────────────────
 
 const outlineTool = tool({
   name: "outline",
   description:
     "The manuscript's headings, indented by level, each with what the book makes of it (title, part, chapter, scene, by the structure settings), its lines and words.",
-  properties: {},
+  properties: bookProps,
   readOnly: true,
-  async run(_, ctx) {
-    const md = await readManuscript(ctx.projectId);
-    const { structure } = await config(ctx.projectId);
+  async run(args, ctx) {
+    const id = await bookOf(args, ctx);
+    const md = await readManuscript(id);
+    const { structure } = await config(id);
     const lines = md.split("\n");
     const sections = sectionsOf(md);
     if (!sections.length) return `No headings. The manuscript has ${lines.length} lines and ${countWords(md).toLocaleString("en")} words.`;
@@ -62,22 +85,22 @@ const readManuscriptTool = tool({
   name: "read_manuscript",
   description:
     "Read the manuscript (markdown), numbered by line: a section by its heading, and/or from `offset` for `limit` lines. Read-only: it comes from the writer's editor.",
-  properties: { heading: str("A heading's text (or part of it), to read just that section."), ...rangeProps },
+  properties: { heading: str("A heading's text (or part of it), to read just that section."), ...rangeProps, ...bookProps },
   readOnly: true,
-  run: async (args, ctx) => excerpt(await readManuscript(ctx.projectId), args),
+  run: async (args, ctx) => excerpt(await readManuscript(await bookOf(args, ctx)), args),
 });
 
 const searchTool = tool({
   name: "search_manuscript",
   description: "Find the manuscript's lines containing some text (case-insensitive): to find markup like `***`, `> `, HTML or a phrase.",
-  properties: { query: str("The text to look for.") },
+  properties: { query: str("The text to look for."), ...bookProps },
   required: ["query"],
   readOnly: true,
-  async run({ query }, ctx) {
+  async run({ query, book }, ctx) {
     const q = query.toLowerCase();
     const hits: string[] = [];
     let total = 0;
-    (await readManuscript(ctx.projectId)).split("\n").forEach((line, i) => {
+    (await readManuscript(await bookOf({ book }, ctx))).split("\n").forEach((line, i) => {
       if (!line.toLowerCase().includes(q)) return;
       total++;
       if (hits.length < 50) hits.push(`${i + 1}\t${line.length > 300 ? `${line.slice(0, 300)}…` : line}`);
@@ -104,10 +127,10 @@ Fonts: ${FONTS.map((f) => `${f.id} (${f.name}, ${f.kind})`).join(", ")}.`;
 const readSettingsTool = tool({
   name: "read_settings",
   description: "The book's settings (JSON), all or one section, with what each one means and the fonts available.",
-  properties: { section: oneOf(SECTIONS, "Just this section.") },
+  properties: { section: oneOf(SECTIONS, "Just this section."), ...bookProps },
   readOnly: true,
-  async run({ section }, ctx) {
-    const c = await config(ctx.projectId);
+  async run({ section, book }, ctx) {
+    const c = await config(await bookOf({ book }, ctx));
     const value = section ? { [section]: c[section] } : c;
     return `${JSON.stringify(value, null, 2)}\n\n${SETTINGS_GUIDE}`;
   },
@@ -168,10 +191,11 @@ const readMatterTool = tool({
   name: "read_matter",
   description:
     "The front and back matter: without `id`, the sections in order; with it, one section's settings and text (markdown; {{title}}, {{author}}… are filled at export).",
-  properties: { id: str("The section's id.") },
+  properties: { id: str("The section's id."), ...bookProps },
   readOnly: true,
-  async run({ id }, ctx) {
-    const c = await config(ctx.projectId);
+  async run({ id, book }, ctx) {
+    const projectId = await bookOf({ book }, ctx);
+    const c = await config(projectId);
     if (!id) {
       if (!c.matter.length) return "No front or back matter.";
       return c.matter
@@ -179,7 +203,7 @@ const readMatterTool = tool({
         .join("\n");
     }
     const m = sectionOf(c, id);
-    return `${JSON.stringify(m)}\n\nVariables: ${VARIABLES.map((v) => `{{${v}}}`).join(" ")}\n\n"""\n${await readMatter(ctx.projectId, id)}\n"""`;
+    return `${JSON.stringify(m)}\n\nVariables: ${VARIABLES.map((v) => `{{${v}}}`).join(" ")}\n\n"""\n${await readMatter(projectId, id)}\n"""`;
   },
 });
 
@@ -226,11 +250,11 @@ const readCustomTool = tool({
   name: "read_custom",
   description:
     "Read one of the book's custom files, numbered by line: custom.typ (after the PDF's setup: #set/#show rules, #let over book.typ's functions), custom.css (after the EPUB's stylesheet), filter.lua (a pandoc filter after the built-in one, both formats).",
-  properties: { file: oneOf(CUSTOM_NAMES, "Which file."), ...rangeProps },
+  properties: { file: oneOf(CUSTOM_NAMES, "Which file."), ...rangeProps, ...bookProps },
   required: ["file"],
   readOnly: true,
-  async run({ file, ...range }, ctx) {
-    const content = await readCustom(ctx.projectId, CUSTOM[file]);
+  async run({ file, book, ...range }, ctx) {
+    const content = await readCustom(await bookOf({ book }, ctx), CUSTOM[file]);
     return content ? excerpt(content, range) : `${file} is empty.`;
   },
 });
@@ -273,10 +297,10 @@ const readBuiltinTool = tool({
   name: "read_builtin",
   description:
     "Read the built-in files, numbered by line: book.typ (the PDF's Typst functions: openers, scene breaks, matter pages, page furniture), book.lua (the pandoc filter), pdf-setup.typ (the PDF document around the book, generated from the settings now: the cfg dictionary, the page and text setup), epub.css (the EPUB stylesheet generated from the settings now, without @font-face rules).",
-  properties: { file: oneOf(BUILTIN, "Which file."), ...rangeProps },
+  properties: { file: oneOf(BUILTIN, "Which file."), ...rangeProps, ...bookProps },
   required: ["file"],
   readOnly: true,
-  run: async ({ file, ...range }, ctx) => excerpt(await builtin(ctx.projectId, file), range),
+  run: async ({ file, book, ...range }, ctx) => excerpt(await builtin(await bookOf({ book }, ctx), file), range),
 });
 
 // ─── Notes ───────────────────────────────────────────────────
@@ -284,10 +308,10 @@ const readBuiltinTool = tool({
 const readNotesTool = tool({
   name: "read_notes",
   description: "Read the book's Notes, numbered by line: the writer's art direction for the typesetting, and what you've settled together.",
-  properties: rangeProps,
+  properties: { ...rangeProps, ...bookProps },
   readOnly: true,
-  async run(range, ctx) {
-    const notes = await readNotes(ctx.projectId);
+  async run({ book, ...range }, ctx) {
+    const notes = await readNotes(await bookOf({ book }, ctx));
     return notes.trim() ? excerpt(notes, range) : "The Notes are empty.";
   },
 });
@@ -315,6 +339,7 @@ const editNotesTool = tool({
 });
 
 export const bookTools: Tool[] = [
+  listBooksTool,
   outlineTool,
   readManuscriptTool,
   searchTool,

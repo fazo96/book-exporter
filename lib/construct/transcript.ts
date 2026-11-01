@@ -166,13 +166,18 @@ export function visibleConfig(options: SessionConfigOption[] | null | undefined)
  */
 export const renderedPage = ({ page, file }: Render) => `Page ${page} (rendered as ${file}):`;
 
+/** A rendered page's name, without .png: its export's time, page and dpi, then the book's id when it's another book's. */
+export const renderName = (stamp: string, page: number, dpi: number, book?: string) => `${stamp}-p${page}-r${dpi}${book ? `-${book}` : ""}`;
+
 /** The pages a render_pages result names, wherever the agent nested it; null when none. */
 export function rendersIn(output: unknown): Render[] | null {
   if (output === undefined || output === null) return null;
   const text = JSON.stringify(output);
   const out: Render[] = [];
   for (const m of text.matchAll(/Page (\d+) \(rendered as ([a-z0-9][a-z0-9-]*\.png)\):/g)) {
-    if (!out.some((r) => r.file === m[2])) out.push({ page: Number(m[1]), file: m[2] });
+    if (out.some((r) => r.file === m[2])) continue;
+    const book = m[2].match(/^[a-z0-9]+-p\d+-r\d+-([a-z0-9][a-z0-9-]*)\.png$/)?.[1];
+    out.push({ page: Number(m[1]), file: m[2], ...(book ? { book } : {}) });
   }
   return out.length ? out : null;
 }
@@ -181,7 +186,7 @@ export function rendersIn(output: unknown): Render[] | null {
 function brief(input: unknown): Record<string, string> | undefined {
   if (!input || typeof input !== "object") return undefined;
   const out: Record<string, string> = {};
-  for (const k of ["id", "kind", "file", "heading", "query", "text", "pages", "formats", "offset", "limit", "path"]) {
+  for (const k of ["id", "kind", "file", "heading", "query", "text", "pages", "formats", "offset", "limit", "path", "name", "book"]) {
     const v = (input as Record<string, unknown>)[k];
     if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") out[k] = String(v).slice(0, 120);
   }

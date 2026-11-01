@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 import { handleMcp } from "../lib/construct/mcp.ts";
 import { settingsDiffs } from "../lib/construct/tools/book.ts";
@@ -7,12 +10,14 @@ import { callTool, listTools } from "../lib/construct/tools/index.ts";
 import { parsePages } from "../lib/construct/tools/preview.ts";
 import type { BookPart } from "../lib/construct/types.ts";
 import {
+  addAttachment,
   createProject,
   readConfig,
   readCustom,
   readMatter,
   readNotes,
   restoreSnapshot,
+  setAttachmentCaption,
   snapshotBook,
   writeCustom,
   writeNotes,
@@ -189,4 +194,88 @@ test("export_book exports the PDF, render_pages shows its pages, find_in_pdf fin
   assert.ok(Buffer.from(shown.images![0].data, "base64").subarray(1, 4).toString() === "PNG");
   assert.match((await call("read_build_log", { problems: true })).text, /./);
   assert.match((await call("read_epub")).text, /no EPUB yet/);
+
+  // Another book's chat looks at this book's pages: kept with its own renders, named after this one.
+  const { id: elsewhere } = await createProject("# Elsewhere Book\n\nText.");
+  const theirs = await callTool("render_pages", { pages: "1", book: id }, ctx(elsewhere));
+  assert.equal(theirs.isError, false, theirs.text);
+  assert.match(theirs.text, new RegExp(`in the PDF of ${id} exported`));
+  assert.match(theirs.text, new RegExp(`Page 1 \\(rendered as [a-z0-9]+-p1-r60-${id}\\.png\\):`));
+  assert.match((await callTool("find_in_pdf", { text: "harbour", book: id }, ctx(elsewhere))).text, /^Page \d+:/);
+});
+
+test("the reading tools read another book with `book`; the writing tools only ever this one", async () => {
+  const { id } = await createProject("# Here Book\n\nHere.");
+  const { id: other } = await createProject("# There Book\n\n### Only Chapter\n\nThere.");
+  await writeNotes(other, "Small caps everywhere.");
+  await writeCustom(other, "typ", "#set text(tracking: 0.02em)");
+  const call = (name: string, args: Record<string, unknown> = {}) => callTool(name, args, ctx(id));
+
+  const books = (await call("list_books")).text;
+  assert.match(books, new RegExp(`^${id} \\(this book\\): "Here Book"`, "m"));
+  assert.match(books, new RegExp(`^${other}: "There Book", \\d+ words, never exported$`, "m"));
+  assert.match((await call("outline", { book: other })).text, /### Only Chapter/);
+  assert.match((await call("read_manuscript", { book: other })).text, /There\./);
+  assert.match((await call("read_notes", { book: other })).text, /Small caps everywhere\./);
+  assert.match((await call("read_custom", { file: "custom.typ", book: other })).text, /tracking: 0\.02em/);
+  assert.match((await call("read_settings", { section: "metadata", book: other })).text, /"There Book"/);
+  assert.match((await call("read_notes")).text, /Notes are empty/, "without `book`, this one");
+  assert.match((await call("read_notes", { book: id })).text, /Notes are empty/);
+  for (const bad of ["no-such-book", "../data"]) {
+    const r = await call("read_notes", { book: bad });
+    assert.equal(r.isError, true);
+    assert.match(r.text, /list_books lists them/);
+  }
+
+  for (const t of listTools()) {
+    if (!t.annotations.readOnlyHint) assert.equal(Object.hasOwn(t.inputSchema.properties, "book"), false, `${t.name} writes, so it can't take book`);
+  }
+  // A `book` given to a write is ignored: it isn't in the schema, so readArgs drops it.
+  await call("edit_notes", { new_text: "Mine.", book: other });
+  assert.equal(await readNotes(id), "Mine.");
+  assert.equal(await readNotes(other), "Small caps everywhere.");
+});
+
+test("attachments are listed with their captions, looked at as images and read as text", { skip: !(has("magick") && has("pdftoppm", "-v") && has("typst")) }, async () => {
+  const { id } = await createProject("# Attach Book\n\nText.");
+  const { id: other } = await createProject("# Attach Other\n\nText.");
+  const call = (name: string, args: Record<string, unknown> = {}) => callTool(name, args, ctx(id));
+  assert.equal((await call("list_attachments")).text, "No attachments.");
+
+  const dir = mkdtempSync(path.join(tmpdir(), "bookx-attach-"));
+  try {
+    // A big image, which comes back scaled down, and a two-page PDF with text.
+    spawnSync("magick", ["-size", "3000x2000", "xc:#c0a080", path.join(dir, "spread.png")]);
+    writeFileSync(path.join(dir, "guide.typ"), "#set page(width: 100mm, height: 140mm)\nChapter openers sit low.\n#pagebreak()\nScene breaks are a fleuron.");
+    assert.equal(spawnSync("typst", ["compile", path.join(dir, "guide.typ")]).status, 0);
+    const spread = await addAttachment(id, new Uint8Array(readFileSync(path.join(dir, "spread.png"))), "png", "spread.png");
+    await setAttachmentCaption(id, spread, "The margins.");
+    const guide = await addAttachment(other, new Uint8Array(readFileSync(path.join(dir, "guide.pdf"))), "pdf", "Style Guide.pdf");
+    assert.equal(guide, "style-guide.pdf");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+
+  assert.match((await call("list_attachments")).text, /^spread\.png \(PNG image, \d+ KB\): The margins\.$/);
+  assert.match((await call("list_attachments", { book: other })).text, /^style-guide\.pdf \(PDF, 2 pages, \d+ KB\)$/);
+
+  const image = await call("view_attachment", { name: "spread.png" });
+  assert.equal(image.isError, false, image.text);
+  assert.match(image.text, /The writer's caption: The margins\./);
+  assert.equal(image.images?.[0].mimeType, "image/jpeg");
+  const jpeg = Buffer.from(image.images![0].data, "base64");
+  assert.deepEqual([...jpeg.subarray(0, 3)], [0xff, 0xd8, 0xff]);
+  const dims = spawnSync("magick", ["identify", "-format", "%wx%h", "-"], { input: jpeg }).stdout.toString();
+  assert.equal(dims, "1568x1045");
+
+  const pages = await call("view_attachment", { name: "style-guide.pdf", pages: "1-2", book: other });
+  assert.equal(pages.isError, false, pages.text);
+  assert.match(pages.text, /^style-guide\.pdf, pages 1, 2 of 2:$/);
+  assert.equal(pages.images?.length, 2);
+  assert.match((await call("view_attachment", { name: "style-guide.pdf", pages: "3", book: other })).text, /has 2 pages/);
+
+  const text = (await call("read_attachment", { name: "style-guide.pdf", book: other })).text;
+  assert.match(text, /--- Page 1 ---\n.*Chapter openers sit low\.[\s\S]*--- Page 2 ---\n.*Scene breaks are a fleuron\./);
+  assert.match((await call("read_attachment", { name: "spread.png" })).text, /is an image: view_attachment shows it/);
+  assert.match((await call("view_attachment", { name: "gone.png" })).text, /No attachment "gone\.png"\. There are: spread\.png\./);
 });

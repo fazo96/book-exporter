@@ -270,7 +270,7 @@ export default function Book({ initial }: { initial: ProjectView }) {
           />
         )}
         {tab === "custom" && <CustomTab custom={custom} setCustom={(k, text) => setCustom((c) => ({ ...c, [k]: text }))} />}
-        {tab === "notes" && <NotesTab notes={notes} setNotes={setNotes} ai={view.ai} />}
+        {tab === "notes" && <NotesTab view={view} notes={notes} setNotes={setNotes} onAttachmentsChanged={() => void refresh()} />}
         {tab === "export" && <ExportTab view={view} dirty={dirty} save={save} onBuilt={() => void refresh()} />}
       </main>
       {view.ai && (

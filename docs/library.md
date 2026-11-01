@@ -15,6 +15,8 @@
 <id>/dist/            the last export: the files, build.json, build.log
 <id>/pen.json         the pen book its manuscript is pulled from (lib/pen.ts)
 <id>/notes.md         the Notes: the art direction Construct follows
+<id>/attachments/     images and PDFs for Construct to look at (below the Notes)
+<id>/attachments.json their captions: { "<name>": { "caption": "…" } }
 <id>/construct/       Construct's chats, snapshots/ and renders/ (docs/construct.md)
 .trash/<id>--<time>/  deleted books
 .bookx-pen.json       the pen connection: pen's address and session (mode 600)
@@ -37,13 +39,17 @@ The identifier is minted once (`urn:uuid:…`) when a book is created and never 
 
 Sections are added and removed only through `addMatter`/`deleteMatter` (they own a file); `saveConfig` can reorder and edit them but drops ids it doesn't know. A new book starts with a copyright page.
 
+## Attachments
+
+Images and PDFs the writer adds in the Notes tab for [Construct](construct.md#attachments) to look at. The type comes from the bytes (`sniffAttachment`): PNG, JPEG, WebP, GIF or PDF, up to 20 MB, never SVG. The name is the uploaded file's, slugified, with the type's extension, and `-2`, `-3`… when taken (`addAttachment`, which claims it with `createExclusive`); names match `^[a-z0-9][a-z0-9-]{0,79}\.(png|jpg|webp|gif|pdf)$` (`isValidAttachment`). A caption is up to 2,000 characters; an empty one is removed. They're listed oldest first. Nothing writes an attachment once it's added: the writer adds, captions and removes them, and Construct only looks.
+
 ## Versions
 
 Replacing the manuscript (`replaceManuscript`) moves the old text to `versions/<ISO time>.md` unless the new text is identical, and answers the word and chapter counts before and after. Restoring a version is a replace with its text, so the current one becomes a version in turn. Nothing prunes versions yet.
 
 ## Copies
 
-`cloneProject` copies a book to `<id>-copy` (`-copy-2`, `-copy-3`… when taken): its settings, manuscript, matter, custom files, Notes, cover and pen link, but not its versions, exports or Construct's chats. The copy gets a new identifier, since a copy is usually another edition (a paperback, an advance copy) and stores and e-readers tell editions apart by it. The title stays, so the library shows the id on cards whose titles are shared.
+`cloneProject` copies a book to `<id>-copy` (`-copy-2`, `-copy-3`… when taken): its settings, manuscript, matter, custom files, Notes, attachments, cover and pen link, but not its versions, exports or Construct's chats. The copy gets a new identifier, since a copy is usually another edition (a paperback, an advance copy) and stores and e-readers tell editions apart by it. The title stays, so the library shows the id on cards whose titles are shared.
 
 ## pen
 
